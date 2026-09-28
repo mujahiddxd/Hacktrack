@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logoutAction } from "@/actions/auth";
-import { Terminal, Calendar, LogOut, Settings, Plus, Sparkles, History } from "lucide-react";
+import { Terminal, Calendar, LogOut, Settings, Plus, Sparkles, History, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function Navbar({ adminEmail }: { adminEmail?: string }) {
@@ -16,6 +16,7 @@ export function Navbar({ adminEmail }: { adminEmail?: string }) {
     { name: "Dashboard", href: "/dashboard", icon: Terminal },
     { name: "Hackathons", href: "/hackathons", icon: Calendar },
     { name: "History", href: "/history", icon: History },
+    { name: "Test Email", href: "/test-email", icon: Mail },
     { name: "Settings", href: "/settings", icon: Settings },
   ];
 

@@ -1,37 +1,43 @@
 import { google } from "googleapis";
+import nodemailer from "nodemailer";
 import { prisma } from "@/lib/prisma";
 
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/api/auth/google/callback"
-);
+export function getOAuth2Client() {
+  return new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/api/auth/google/callback"
+  );
+}
 
 const SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
   "https://www.googleapis.com/auth/userinfo.email",
 ];
 
-export function getGoogleAuthUrl(): string {
+export function getGoogleAuthUrl(returnTo: string = "/settings"): string {
   if (!process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID.trim() === "") {
     throw new Error(
       "GOOGLE_CLIENT_ID is not configured in hacktrack/.env. Add your Google OAuth credentials or use 'Connect Demo Account' to test immediately."
     );
   }
 
-  return oauth2Client.generateAuthUrl({
+  const client = getOAuth2Client();
+  return client.generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
     scope: SCOPES,
+    state: returnTo,
   });
 }
 
 export async function exchangeCodeForTokens(code: string) {
-  const { tokens } = await oauth2Client.getToken(code);
-  oauth2Client.setCredentials(tokens);
+  const client = getOAuth2Client();
+  const { tokens } = await client.getToken(code);
+  client.setCredentials(tokens);
 
   // Fetch email of the connected Google account
-  const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
+  const oauth2 = google.oauth2({ version: "v2", auth: client });
   const userInfo = await oauth2.userinfo.get();
   const email = userInfo.data.email || "admin@gmail.com";
 
@@ -92,6 +98,19 @@ export async function connectDemoAccount(email = "organizer.hacktrack@gmail.com"
 }
 
 export async function getConnectedGmailAccount() {
+  // Check if SMTP App Password is configured in .env
+  const smtpPass = process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
+  const smtpUser = process.env.SMTP_USER || process.env.SMTP_EMAIL || "mujahidchoudhry37@gmail.com";
+  if (smtpPass && smtpPass.trim() !== "") {
+    return {
+      email: smtpUser,
+      connected: true,
+      isDemo: false,
+      isSmtp: true,
+      updatedAt: new Date(),
+    };
+  }
+
   const token = await prisma.googleAuthToken.findUnique({
     where: { id: "primary" },
   });
@@ -100,6 +119,7 @@ export async function getConnectedGmailAccount() {
     email: token.email,
     connected: true,
     isDemo: token.refreshToken.startsWith("demo_"),
+    isSmtp: false,
     updatedAt: token.updatedAt,
   };
 }
@@ -118,11 +138,7 @@ export async function getAuthenticatedGmailClient() {
     throw new Error("Gmail is not connected. Please connect Google OAuth first.");
   }
 
-  const client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/api/auth/google/callback"
-  );
+  const client = getOAuth2Client();
 
   client.setCredentials({
     access_token: token.accessToken,
@@ -158,24 +174,64 @@ export async function sendEmail({
   subject: string;
   body: string;
 }) {
+  // 1. First priority: Direct Gmail SMTP if App Password is provided in .env
+  const smtpPass = process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
+  const smtpUser = process.env.SMTP_USER || process.env.SMTP_EMAIL || "mujahidchoudhry37@gmail.com";
+
+  if (smtpPass && smtpPass.trim() !== "") {
+    const cleanPass = smtpPass.replace(/\s+/g, "").trim();
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
+      port: Number(process.env.SMTP_PORT || 465),
+      secure: Number(process.env.SMTP_PORT || 465) === 465,
+      auth: {
+        user: smtpUser,
+        pass: cleanPass,
+      },
+    });
+
+    const info = await transporter.sendMail({
+      from: `"HackTrack" <${smtpUser}>`,
+      to,
+      subject,
+      text: body,
+    });
+
+    console.log(`\n======================================================`);
+    console.log(`[DISPATCHED VIA REAL GMAIL SMTP]`);
+    console.log(`  To: ${to}`);
+    console.log(`  From: ${smtpUser}`);
+    console.log(`  Message ID: ${info.messageId}`);
+    console.log(`======================================================\n`);
+
+    return { id: info.messageId, threadId: info.messageId, isRealDelivery: true };
+  }
+
+  // 2. Second priority: OAuth Token via Google Cloud API
   const token = await prisma.googleAuthToken.findUnique({
     where: { id: "primary" },
   });
   if (!token || !token.refreshToken) {
-    throw new Error("Gmail is not connected. Please connect Google OAuth first.");
+    throw new Error(
+      "No live email delivery configured. To receive real emails in your inbox, either provide a Google App Password (SMTP_PASS in .env) or authorize Google OAuth in Google Cloud Console."
+    );
   }
 
-  // Handle Demo Mode or missing Client Secret
+  // Demo Simulator Mode
   if (token.refreshToken.startsWith("demo_") || !process.env.GOOGLE_CLIENT_SECRET) {
     console.log(`\n======================================================`);
-    console.log(`[DISPATCHED VIA GMAIL SIMULATOR]`);
+    console.log(`[DISPATCHED VIA GMAIL SIMULATOR (No real email sent)]`);
     console.log(`  To: ${to}`);
     console.log(`  From: ${token.email}`);
     console.log(`  Subject: ${subject}`);
     console.log(`  Body: ${body.slice(0, 100)}...`);
     console.log(`======================================================\n`);
     await new Promise((resolve) => setTimeout(resolve, 350));
-    return { id: "demo_msg_" + Date.now(), threadId: "demo_th_" + Date.now() };
+    return {
+      id: "demo_msg_" + Date.now(),
+      threadId: "demo_th_" + Date.now(),
+      isDemo: true,
+    };
   }
 
   // Production Gmail API dispatch
@@ -206,5 +262,5 @@ export async function sendEmail({
     },
   });
 
-  return response.data;
+  return { ...response.data, isRealDelivery: true };
 }

@@ -27,6 +27,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/hackathons") ||
     pathname.startsWith("/history") ||
+    pathname.startsWith("/test-email") ||
     pathname.startsWith("/settings");
 
   if (isProtectedRoute && !isAuthenticated) {
@@ -47,6 +48,7 @@ export const config = {
     "/dashboard/:path*",
     "/hackathons/:path*",
     "/history/:path*",
+    "/test-email/:path*",
     "/settings/:path*",
     "/login",
   ],
