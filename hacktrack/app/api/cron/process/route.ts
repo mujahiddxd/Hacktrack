@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processDueScheduledMessages } from "@/lib/scheduler";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
 
