@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Admin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model GoogleAuthToken {
+  id           String   @id @default("primary")
+  email        String
+  accessToken  String
+  refreshToken String
+  tokenType    String   @default("Bearer")
+  scope        String
+  expiryDate   BigInt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Hackathon {
+  id                   String             @id @default(cuid())
+  name                 String
+  description          String
+  roundDetails         String?
+  hackathonDate        DateTime
+  registrationDeadline DateTime
+  fee                  String             @default("Free")
+  location             String
+  registrationLink     String?
+  status               String             @default("ACTIVE")
+  deletedAt            DateTime?
+  participants         Participant[]
+  scheduledMessages    ScheduledMessage[]
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([status])
+}
+
+model Participant {
+  id           String             @id @default(cuid())
+  hackathonId  String
+  hackathon    Hackathon          @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
+  name         String
+  email        String
+  recipients   MessageRecipient[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@unique([hackathonId, email])
+  @@index([hackathonId])
+}
+
+model ScheduledMessage {
+  id           String             @id @default(cuid())
+  hackathonId  String
+  hackathon    Hackathon          @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
+  subject      String
+  message      String
+  scheduledAt  DateTime
+  status       String             @default("SCHEDULED")
+  sentAt       DateTime?
+  recipients   MessageRecipient[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([hackathonId])
+  @@index([status, scheduledAt])
+}
+
+model MessageRecipient {
+  id                 String           @id @default(cuid())
+  scheduledMessageId String
+  scheduledMessage   ScheduledMessage @relation(fields: [scheduledMessageId], references: [id], onDelete: Cascade)
+  participantId      String
+  participant        Participant      @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  status             String           @default("PENDING")
+  sentAt             DateTime?
+  errorMessage       String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([scheduledMessageId])
+  @@index([participantId])
+}
