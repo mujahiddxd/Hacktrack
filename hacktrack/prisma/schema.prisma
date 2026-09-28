@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -19,10 +19,10 @@ model Admin {
 model GoogleAuthToken {
   id           String   @id @default("primary")
   email        String
-  accessToken  String
-  refreshToken String
+  accessToken  String   @db.Text
+  refreshToken String   @db.Text
   tokenType    String   @default("Bearer")
-  scope        String
+  scope        String   @db.Text
   expiryDate   BigInt
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -31,8 +31,8 @@ model GoogleAuthToken {
 model Hackathon {
   id                   String             @id @default(cuid())
   name                 String
-  description          String
-  roundDetails         String?
+  description          String             @db.Text
+  roundDetails         String?            @db.Text
   hackathonDate        DateTime
   registrationDeadline DateTime
   fee                  String             @default("Free")
@@ -67,7 +67,7 @@ model ScheduledMessage {
   hackathonId  String
   hackathon    Hackathon          @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
   subject      String
-  message      String
+  message      String             @db.Text
   scheduledAt  DateTime
   status       String             @default("SCHEDULED")
   sentAt       DateTime?
@@ -87,7 +87,7 @@ model MessageRecipient {
   participant        Participant      @relation(fields: [participantId], references: [id], onDelete: Cascade)
   status             String           @default("PENDING")
   sentAt             DateTime?
-  errorMessage       String?
+  errorMessage       String?          @db.Text
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
