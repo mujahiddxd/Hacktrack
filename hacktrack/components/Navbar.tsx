@@ -15,6 +15,7 @@ export function Navbar({ adminEmail }: { adminEmail?: string }) {
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: Terminal },
     { name: "Hackathons", href: "/hackathons", icon: Calendar },
+    { name: "AI Add", href: "/ai-add", icon: Sparkles },
     { name: "History", href: "/history", icon: History },
     { name: "Test Email", href: "/test-email", icon: Mail },
     { name: "Settings", href: "/settings", icon: Settings },

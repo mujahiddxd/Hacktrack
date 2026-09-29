@@ -5,7 +5,7 @@ import { useActionState } from "react";
 import { loginAction } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShieldCheck, ArrowRight, Lock } from "lucide-react";
+import { ArrowRight, Lock } from "lucide-react";
 
 export default function LoginPage() {
   const [state, formAction, isPending] = useActionState(loginAction, null);
@@ -46,8 +46,8 @@ export default function LoginPage() {
               type="email"
               name="email"
               required
-              placeholder="admin@hacktrack.com"
-              defaultValue="admin@hacktrack.com"
+              placeholder="admin@example.com"
+              autoComplete="email"
             />
 
             <Input
@@ -56,7 +56,7 @@ export default function LoginPage() {
               name="password"
               required
               placeholder="••••••••••••"
-              defaultValue="adminpassword123"
+              autoComplete="current-password"
             />
 
             <div className="pt-2">
@@ -72,15 +72,6 @@ export default function LoginPage() {
               </Button>
             </div>
           </form>
-
-          {/* Seed hint */}
-          <div className="mt-6 pt-5 border-t-2 border-[#121212] text-center">
-            <p className="text-xs font-mono text-[#71717A]">
-              Default Seed:{" "}
-              <strong className="text-[#121212]">admin@hacktrack.com</strong> /{" "}
-              <strong className="text-[#121212]">adminpassword123</strong>
-            </p>
-          </div>
         </div>
       </div>
     </div>
