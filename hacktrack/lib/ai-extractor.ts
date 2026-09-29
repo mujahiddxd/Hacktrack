@@ -240,7 +240,7 @@ export function heuristicExtractHackathon(text: string): AiExtractedHackathon {
     }
   }
   if (!registrationLink && urls.length > 0) {
-    registrationLink = urls[0];
+    registrationLink = urls[0] ?? null;
   }
 
   // 3. Fee Extraction
