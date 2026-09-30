@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   extractAndCheckHackathonAction,
+  getAiEngineStatusAction,
   createHackathon,
   checkHackathonDateConflict,
   type DateConflictCheckResult,
@@ -28,11 +29,17 @@ import {
   FileText,
   Loader2,
   RefreshCw,
+  Cpu,
+  KeyRound,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AiAddPage() {
   const router = useRouter();
+
+  // AI engine status state
+  const [engineStatus, setEngineStatus] = useState<{ hasKey: boolean; provider: string } | null>(null);
 
   // Extraction step state
   const [rawText, setRawText] = useState("");
@@ -40,20 +47,33 @@ export default function AiAddPage() {
   const [extractError, setExtractError] = useState<string | null>(null);
   const [extractedData, setExtractedData] = useState<AiExtractedHackathon | null>(null);
 
-  // Form submission & conflict states
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [enableBroadcast, setEnableBroadcast] = useState(true);
+  // Controlled form input states
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [roundDetails, setRoundDetails] = useState("");
   const [hackathonDate, setHackathonDate] = useState("");
+  const [registrationDeadline, setRegistrationDeadline] = useState("");
+  const [fee, setFee] = useState("Free");
+  const [location, setLocation] = useState("Online / Discord");
+  const [registrationLink, setRegistrationLink] = useState("");
+
+  // Broadcast states
+  const [enableBroadcast, setEnableBroadcast] = useState(true);
+  const [broadcastSubject, setBroadcastSubject] = useState("");
+  const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [broadcastScheduledAt, setBroadcastScheduledAt] = useState("");
+
+  // Conflict & submission states
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckingConflict, setIsCheckingConflict] = useState(false);
   const [conflictData, setConflictData] = useState<DateConflictCheckResult | null>(null);
   const [showConflictConfirm, setShowConflictConfirm] = useState(false);
   const [pendingFormData, setPendingFormData] = useState<FormData | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Suggested default broadcast datetime: tomorrow at 09:00 AM
-  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  tomorrow.setHours(9, 0, 0, 0);
-  const defaultBroadcastDate = tomorrow.toISOString().slice(0, 16);
+  useEffect(() => {
+    getAiEngineStatusAction().then(setEngineStatus).catch(() => {});
+  }, []);
 
   const handleExtract = async () => {
     if (!rawText.trim()) {
@@ -73,23 +93,62 @@ export default function AiAddPage() {
       }
 
       if (res?.data) {
-        setExtractedData(res.data);
-        const extractedDate = res.data.hackathonDate || "";
+        const d = res.data;
+        setExtractedData(d);
+
+        // Update all controlled fields
+        setName(d.name || "");
+        setDescription(d.description || "");
+        setRoundDetails(d.roundDetails || "");
+        setFee(d.fee || "Free");
+        setLocation(d.location || "Online / Discord");
+        setRegistrationLink(d.registrationLink || "");
+
+        const extractedDate = d.hackathonDate || "";
         setHackathonDate(extractedDate);
 
+        const extractedDeadline = d.registrationDeadline || "";
+        setRegistrationDeadline(extractedDeadline);
+
+        // Calculate smart broadcast defaults
+        const eventName = d.name || "the Hackathon";
+        setBroadcastSubject(`Important Guidelines & Access Schedule for ${eventName}`);
+        setBroadcastMessage(
+          `Hello {name},\n\nWelcome to ${eventName}! Please review our schedule, challenge tracks, and submission guidelines.\n\nHappy hacking!\nOrganizing Committee`
+        );
+
+        if (extractedDate) {
+          const eventTime = new Date(extractedDate).getTime();
+          if (!isNaN(eventTime)) {
+            // Default broadcast to 1 day before the hackathon at 9:00 AM
+            const oneDayBefore = new Date(eventTime - 24 * 60 * 60 * 1000);
+            oneDayBefore.setHours(9, 0, 0, 0);
+            setBroadcastScheduledAt(oneDayBefore.toISOString().slice(0, 16));
+          } else {
+            const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+            tomorrow.setHours(9, 0, 0, 0);
+            setBroadcastScheduledAt(tomorrow.toISOString().slice(0, 16));
+          }
+        } else {
+          const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+          tomorrow.setHours(9, 0, 0, 0);
+          setBroadcastScheduledAt(tomorrow.toISOString().slice(0, 16));
+        }
+
+        // Handle date conflicts
         if (res.dateConflict) {
           setConflictData(res.dateConflict);
           if (res.dateConflict.hasConflict) {
             toast.warning(
               `Date Conflict Detected: A hackathon is already registered on ${res.dateConflict.dateFormatted || "this date"}!`,
-              { duration: 5000, id: "ai-date-conflict" }
+              { duration: 6000, id: "ai-date-conflict" }
             );
           } else {
-            toast.success("Hackathon details extracted! Date is clear with no conflicts.");
+            toast.success("Hackathon extracted! Event date is available with no conflicts.");
           }
         } else {
           setConflictData(null);
-          toast.success("Hackathon details extracted successfully!");
+          toast.success("Hackathon extracted successfully!");
         }
       }
     } catch (err: unknown) {
@@ -190,17 +249,34 @@ export default function AiAddPage() {
 
       {/* Header */}
       <div className="brutal-card rounded-2xl p-6 md:p-8 bg-white">
-        <div className="flex items-center gap-3 pb-6 border-b-3 border-[#121212] mb-6">
-          <div className="w-12 h-12 bg-[#FFEB3B] border-3 border-[#121212] shadow-brutal-sm flex items-center justify-center font-black rounded-xl">
-            <Sparkles className="w-6 h-6 text-[#121212]" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b-3 border-[#121212] mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-[#FFEB3B] border-3 border-[#121212] shadow-brutal-sm flex items-center justify-center font-black rounded-xl">
+              <Sparkles className="w-6 h-6 text-[#121212]" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-[#121212] tracking-tight">
+                AI Smart Hackathon Importer
+              </h1>
+              <p className="text-xs font-bold text-[#71717A]">
+                Paste any hackathon PDF, email announcement, or brochure to automatically extract fields and check for schedule conflicts.
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-black text-[#121212] tracking-tight">
-              AI Smart Hackathon Importer
-            </h1>
-            <p className="text-xs font-bold text-[#71717A]">
-              Paste any hackathon PDF, email announcement, or brochure. We will extract structured fields and automatically check for schedule conflicts.
-            </p>
+
+          {/* Engine indicator pill */}
+          <div className="shrink-0">
+            {engineStatus?.hasKey ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-[#00E676]/20 border-2 border-[#121212] rounded-lg text-xs font-mono font-bold text-[#121212] shadow-xs">
+                <Cpu className="w-3.5 h-3.5 text-[#00E676]" />
+                {engineStatus.provider} Generative AI Active
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-[#FFEB3B]/30 border-2 border-[#121212] rounded-lg text-xs font-mono font-bold text-[#121212] shadow-xs">
+                <Info className="w-3.5 h-3.5 text-[#121212]" />
+                NLP Parser (Add GEMINI_API_KEY for LLM)
+              </div>
+            )}
           </div>
         </div>
 
@@ -209,7 +285,7 @@ export default function AiAddPage() {
           <Textarea
             label="Paste Hackathon Announcement / PDF Text"
             rows={6}
-            placeholder="Paste raw hackathon text here... (e.g. 'CodeStorm 2026 takes place on October 15, 2026. Registration deadline is October 10. Venue: Discord/Online. Free entry...')"
+            placeholder="Paste raw hackathon text here... (e.g. 'CodeStorm 2026 takes place on October 15, 2026. Registration deadline is October 10. Venue: Discord/Online. Free entry. Round 1: Idea Pitch...')"
             value={rawText}
             onChange={(e) => setRawText(e.target.value)}
             disabled={isExtracting}
@@ -232,7 +308,7 @@ export default function AiAddPage() {
               {isExtracting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Analyzing & Checking Conflicts...
+                  Analyzing & Checking Schedule...
                 </>
               ) : (
                 <>
@@ -294,14 +370,15 @@ export default function AiAddPage() {
             <div className="space-y-4">
               <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-[#121212] pb-1 border-b-2 border-[#121212] flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-[#2196F3]" />
-                1. Hackathon Information (Extracted & Editable)
+                1. Hackathon Information (Extracted & Fully Editable)
               </h3>
 
               <Input
                 label="Hackathon Name"
                 name="name"
                 required
-                defaultValue={extractedData.name || ""}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. CodeStorm 2026"
               />
 
@@ -310,7 +387,8 @@ export default function AiAddPage() {
                 name="description"
                 required
                 rows={3}
-                defaultValue={extractedData.description || ""}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
                 placeholder="Overview of hackathon themes and goals..."
               />
 
@@ -318,7 +396,8 @@ export default function AiAddPage() {
                 label="Round Details & Milestones (Optional)"
                 name="roundDetails"
                 rows={3}
-                defaultValue={extractedData.roundDetails || ""}
+                value={roundDetails}
+                onChange={(e) => setRoundDetails(e.target.value)}
                 placeholder="Stage 1, Stage 2, Grand Finale..."
               />
 
@@ -342,7 +421,8 @@ export default function AiAddPage() {
                     name="registrationDeadline"
                     type="datetime-local"
                     required
-                    defaultValue={extractedData.registrationDeadline || ""}
+                    value={registrationDeadline}
+                    onChange={(e) => setRegistrationDeadline(e.target.value)}
                     helperText="Cutoff for participant signups"
                   />
                 </div>
@@ -361,7 +441,8 @@ export default function AiAddPage() {
                 <Input
                   label="Registration Fee"
                   name="fee"
-                  defaultValue={extractedData.fee || "Free"}
+                  value={fee}
+                  onChange={(e) => setFee(e.target.value)}
                   placeholder="e.g. Free or ₹500"
                 />
 
@@ -369,7 +450,8 @@ export default function AiAddPage() {
                   label="Location / Venue"
                   name="location"
                   required
-                  defaultValue={extractedData.location || "Online / Discord"}
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
                   placeholder="e.g. Online or Bangalore Hub"
                 />
               </div>
@@ -378,7 +460,8 @@ export default function AiAddPage() {
                 label="External Registration URL (Optional)"
                 name="registrationLink"
                 type="url"
-                defaultValue={extractedData.registrationLink || ""}
+                value={registrationLink}
+                onChange={(e) => setRegistrationLink(e.target.value)}
                 placeholder="https://..."
               />
             </div>
@@ -409,7 +492,8 @@ export default function AiAddPage() {
                     label="Broadcast Subject"
                     name="broadcastSubject"
                     required={enableBroadcast}
-                    defaultValue={`Important Guidelines & Schedule for ${extractedData.name || "Hackathon"}`}
+                    value={broadcastSubject}
+                    onChange={(e) => setBroadcastSubject(e.target.value)}
                   />
 
                   <Textarea
@@ -417,7 +501,8 @@ export default function AiAddPage() {
                     name="broadcastMessage"
                     required={enableBroadcast}
                     rows={3}
-                    defaultValue={`Hello {name},\n\nWelcome to ${extractedData.name || "{hackathonName}"}! Please review the schedule and prepare your submission.\n\nBest regards,\nOrganizing Committee`}
+                    value={broadcastMessage}
+                    onChange={(e) => setBroadcastMessage(e.target.value)}
                   />
 
                   <Input
@@ -425,7 +510,9 @@ export default function AiAddPage() {
                     name="broadcastScheduledAt"
                     type="datetime-local"
                     required={enableBroadcast}
-                    defaultValue={defaultBroadcastDate}
+                    value={broadcastScheduledAt}
+                    onChange={(e) => setBroadcastScheduledAt(e.target.value)}
+                    helperText="Calculated to reach participants prior to event kickoff"
                   />
                 </div>
               )}

@@ -56,9 +56,13 @@ export default async function HackathonDetailPage({ params }: Props) {
               <Badge variant="blue" className="font-mono">
                 Fee: {hackathon.fee}
               </Badge>
+              {/* Subtle coding doodle in whitespace */}
+              <span className="font-mono text-xs font-bold text-[#121212]/30 select-none tracking-widest pl-1">
+                &lt;/&gt;
+              </span>
             </div>
 
-            <h1 className="text-3xl md:text-4xl font-black text-[#121212] tracking-tight">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#121212] tracking-tight leading-[1.1]">
               {hackathon.name}
             </h1>
 
@@ -138,10 +142,13 @@ export default async function HackathonDetailPage({ params }: Props) {
         {/* Round Details Section */}
         {hackathon.roundDetails && (
           <div className="pt-4 border-t-2 border-[#121212]">
-            <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-[#121212] flex items-center gap-1.5 mb-2">
-              <Award className="w-4 h-4 text-[#FF5252]" />
-              Round Milestones & Guidelines
-            </h4>
+            <div className="flex items-center gap-2 mb-2">
+              <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-[#121212] flex items-center gap-1.5">
+                <Award className="w-4 h-4 text-[#FF5252]" />
+                Round Milestones & Guidelines
+              </h4>
+              <span className="font-mono text-xs font-bold text-[#121212]/25 select-none tracking-widest pl-1">&#123; &#125;</span>
+            </div>
             <div className="p-4 bg-neutral-50 border-2 border-[#121212] rounded-xl text-xs font-medium text-[#121212] whitespace-pre-line leading-relaxed">
               {hackathon.roundDetails}
             </div>

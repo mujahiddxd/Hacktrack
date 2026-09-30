@@ -538,10 +538,13 @@ export async function extractAndCheckHackathonAction(rawText: string) {
       }
     }
 
+    const hasKey = !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY);
+
     return {
       success: true,
       data: extracted,
       dateConflict: conflictResult,
+      hasAiKey: hasKey,
     };
   } catch (err: unknown) {
     return {
@@ -549,4 +552,16 @@ export async function extractAndCheckHackathonAction(rawText: string) {
     };
   }
 }
+
+export async function getAiEngineStatusAction() {
+  await requireAdmin();
+  const hasGemini = !!process.env.GEMINI_API_KEY;
+  const hasOpenAI = !!process.env.OPENAI_API_KEY;
+  const hasGroq = !!process.env.GROQ_API_KEY;
+  return {
+    hasKey: hasGemini || hasOpenAI || hasGroq,
+    provider: hasGemini ? "Gemini" : hasOpenAI ? "OpenAI" : hasGroq ? "Groq" : "NLP",
+  };
+}
+
 

@@ -294,7 +294,8 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
           </div>
           <h1 className="text-2xl md:text-3xl font-black text-[#121212] tracking-tight flex items-center gap-3">
             <History className="w-7 h-7" />
-            Hackathon History
+            <span>Hackathon History</span>
+            <span className="font-mono text-xs font-bold text-[#121212]/30 select-none tracking-widest pl-1">&lt;/&gt;</span>
           </h1>
           <p className="text-sm font-bold text-[#121212]/80 mt-1">
             Complete chronological archive of all hackathons entered into HackTrack.

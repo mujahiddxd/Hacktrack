@@ -24,9 +24,12 @@ export default async function HackathonsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b-3 border-[#121212]">
         <div>
-          <h1 className="text-3xl font-black text-[#121212] tracking-tight">
-            Hackathons Directory
-          </h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-3xl font-black text-[#121212] tracking-tight">
+              Hackathons Directory
+            </h1>
+            <span className="font-mono text-xs font-bold text-[#121212]/30 select-none tracking-widest pl-1">&lt;/&gt;</span>
+          </div>
           <p className="text-sm font-bold text-[#71717A] mt-1">
             Create, manage, and broadcast to hackathon participants ({hackathons.length} active)
           </p>

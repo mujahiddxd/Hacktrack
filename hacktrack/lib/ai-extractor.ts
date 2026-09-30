@@ -35,24 +35,20 @@ function normalizeDate(dateStr: string | null | undefined, defaultTime = "09:00"
   if (!dateStr || dateStr.toLowerCase() === "null") return null;
   const clean = dateStr.trim();
 
-  // If already YYYY-MM-DDTHH:mm
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(clean)) {
-    return clean.slice(0, 16);
+  // If already contains YYYY-MM-DD
+  const ymdMatch = clean.match(/(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}:\d{2}))?/);
+  if (ymdMatch) {
+    const time = ymdMatch[4] || defaultTime;
+    return `${ymdMatch[1]}-${ymdMatch[2]}-${ymdMatch[3]}T${time}`;
   }
 
-  // If YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
-    return `${clean}T${defaultTime}`;
-  }
-
-  const parsed = new Date(clean);
+  const parsed = new Date(clean.replace(/(st|nd|rd|th)/gi, ""));
   if (!isNaN(parsed.getTime())) {
     const y = parsed.getFullYear();
     const m = String(parsed.getMonth() + 1).padStart(2, "0");
     const d = String(parsed.getDate()).padStart(2, "0");
     const hh = String(parsed.getHours()).padStart(2, "0");
     const mm = String(parsed.getMinutes()).padStart(2, "0");
-    // If hours and mins are 00:00, use defaultTime
     const time = hh === "00" && mm === "00" ? defaultTime : `${hh}:${mm}`;
     return `${y}-${m}-${d}T${time}`;
   }
@@ -64,52 +60,61 @@ function normalizeDate(dateStr: string | null | undefined, defaultTime = "09:00"
  * Call Google Gemini API
  */
 async function callGemini(text: string, apiKey: string): Promise<AiExtractedHackathon> {
-  const model = "gemini-1.5-flash";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const candidateModels = ["gemini-3-flash-preview", "gemini-3.1-flash-lite", "gemini-flash-latest"];
+  let lastError: Error | null = null;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 25000);
+  for (const model of candidateModels) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
 
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal: controller.signal,
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: `${SYSTEM_PROMPT}\n\nHere is the pasted hackathon text to analyze:\n\n${text}`,
-              },
-            ],
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `${SYSTEM_PROMPT}\n\nHere is the pasted hackathon text to analyze:\n\n${text}`,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.1,
           },
-        ],
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: 0.1,
-        },
-      }),
-    });
+        }),
+      });
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    if (!res.ok) {
-      const errBody = await res.text();
-      throw new Error(`Gemini API error (${res.status}): ${errBody.slice(0, 200)}`);
+      if (!res.ok) {
+        const errBody = await res.text();
+        lastError = new Error(`Gemini API error with model ${model} (${res.status}): ${errBody.slice(0, 200)}`);
+        continue;
+      }
+
+      const data = await res.json();
+      const rawContent = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!rawContent) {
+        lastError = new Error(`No text response received from Gemini model ${model}`);
+        continue;
+      }
+
+      const parsedJson = JSON.parse(rawContent.trim());
+      return validateAndNormalize(parsedJson);
+    } catch (err: unknown) {
+      clearTimeout(timeoutId);
+      lastError = err instanceof Error ? err : new Error(String(err));
+      continue;
     }
-
-    const data = await res.json();
-    const rawContent = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!rawContent) {
-      throw new Error("No text response received from Gemini");
-    }
-
-    const parsedJson = JSON.parse(rawContent.trim());
-    return validateAndNormalize(parsedJson);
-  } finally {
-    clearTimeout(timeoutId);
   }
+
+  throw lastError || new Error("All Gemini model endpoints failed");
 }
 
 /**
@@ -225,18 +230,57 @@ export function heuristicExtractHackathon(text: string): AiExtractedHackathon {
   // 1. Name / Title Extraction
   let name: string | null = null;
 
-  // Strategy A: Explicit Label
-  for (const line of lines) {
-    const labelMatch = line.match(
-      /^(?:hackathon(?:\s+name)?|event(?:\s+name)?|competition(?:\s+name)?|title|initiative|challenge|theme)[:\s\-–]+([^\n\r]+)/i
-    );
-    if (labelMatch && labelMatch[1].trim().length > 2 && labelMatch[1].trim().length < 90) {
-      name = labelMatch[1].replace(/^[#* \-_"']+|[#* \-_"']+$/g, "").trim();
+  // Strategy A: Specific Platform announcement patterns (Unstop, Devpost, Devfolio)
+  const platformPatterns = [
+    /Participate in (?:the\s+)?([A-Za-z0-9\s\-–]+?)(?:\s+before|\s+at|\s+on|\s+now)/i,
+    /All that you need to know about\s+([A-Za-z0-9\s\-–]+)/i,
+    /Presented by\s+[^,]+,\s*([A-Za-z0-9\s\-–]+?)\s+is a/i,
+  ];
+  for (const pat of platformPatterns) {
+    const match = cleanText.match(pat);
+    if (match && match[1].trim().length > 2 && match[1].trim().length < 60) {
+      name = match[1].trim();
       break;
     }
   }
 
-  // Strategy B: Markdown header or prominent line with hackathon keywords
+  // Strategy B: Explicit Label (skip "Hackathon Dates:", "Hackathon Schedule:", etc.)
+  if (!name) {
+    for (const line of lines) {
+      if (/^hackathon\s+(?:dates?|timeline|schedule|rules|details|eligibility|guidelines)/i.test(line)) {
+        continue;
+      }
+      const labelMatch = line.match(
+        /^(?:hackathon(?:\s+name)?|event(?:\s+name)?|competition(?:\s+name)?|title)[:\s\-–]+([^\n\r]+)/i
+      );
+      if (labelMatch && labelMatch[1].trim().length > 2 && labelMatch[1].trim().length < 70) {
+        name = labelMatch[1].replace(/^[#* \-_"']+|[#* \-_"']+$/g, "").trim();
+        break;
+      }
+    }
+  }
+
+  // Strategy C: Line frequency analysis for short title lines (e.g. "WCC Forge 48" repeating 4 times)
+  if (!name) {
+    const freqMap = new Map<string, number>();
+    for (const line of lines) {
+      const clean = line.replace(/^[#* \-_"']+|[#* \-_"']+$/g, "").trim();
+      if (
+        clean.length >= 3 &&
+        clean.length <= 40 &&
+        !/^(?:online|offline|free|overview|details|reviews|watchlist|register|unstop|dates|stages|feedback|faq|prizes)/i.test(clean) &&
+        !clean.startsWith("http")
+      ) {
+        freqMap.set(clean, (freqMap.get(clean) || 0) + 1);
+      }
+    }
+    const sorted = Array.from(freqMap.entries()).sort((a, b) => b[1] - a[1]);
+    if (sorted.length > 0 && sorted[0][1] >= 2) {
+      name = sorted[0][0];
+    }
+  }
+
+  // Strategy D: Markdown header or prominent line with hackathon keywords
   if (!name) {
     for (const line of lines.slice(0, 15)) {
       const clean = line.replace(/^[#* \-_"']+|[#* \-_"']+$/g, "").trim();
@@ -246,7 +290,7 @@ export function heuristicExtractHackathon(text: string): AiExtractedHackathon {
         ) &&
         clean.length >= 3 &&
         clean.length < 85 &&
-        !/^(?:about|rules|guidelines|timeline|schedule|welcome|overview|registration|eligibility)/i.test(clean)
+        !/^(?:about|rules|guidelines|timeline|schedule|welcome|overview|registration|eligibility|dates)/i.test(clean)
       ) {
         name = clean.replace(/^(?:welcome\s+to|announcing\s+(?:the)?|participate\s+in\s+(?:the)?)\s+/i, "");
         break;
@@ -254,7 +298,7 @@ export function heuristicExtractHackathon(text: string): AiExtractedHackathon {
     }
   }
 
-  // Strategy C: First substantive title line
+  // Strategy E: First substantive title line
   if (!name && lines.length > 0) {
     for (const line of lines.slice(0, 5)) {
       const clean = line.replace(/^[#* \-_"']+|[#* \-_"']+$/g, "").trim();
@@ -391,36 +435,97 @@ export function heuristicExtractHackathon(text: string): AiExtractedHackathon {
   let hasDateConflict = false;
   let dateConflictNote: string | null = null;
 
-  // Find deadline candidates
+  // Priority 1: Check for explicit "Registration Deadline:" line
+  const deadlineLineMatch = cleanText.match(
+    /(?:registration\s*deadline|apply\s*by|last\s*date\s*(?:to\s*apply|for\s*registration)?|closes\s*on)[:\s\-–]*([^\n\r]+)/i
+  );
+  if (deadlineLineMatch) {
+    const raw = deadlineLineMatch[1];
+    const dMatch = raw.match(/(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]+(?:\s+\d{4})?)/i);
+    const timeMatch = raw.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (dMatch) {
+      let dateString = dMatch[1].replace(/(st|nd|rd|th)/gi, "").trim();
+      if (!/\d{4}/.test(dateString)) dateString = `${dateString} 2026`;
+      const parsed = new Date(dateString);
+      if (!isNaN(parsed.getTime())) {
+        const y = parsed.getFullYear();
+        const m = String(parsed.getMonth() + 1).padStart(2, "0");
+        const d = String(parsed.getDate()).padStart(2, "0");
+        let hh = "23";
+        let mm = "59";
+        if (timeMatch) {
+          let h = parseInt(timeMatch[1], 10);
+          if (timeMatch[3].toUpperCase() === "PM" && h < 12) h += 12;
+          if (timeMatch[3].toUpperCase() === "AM" && h === 12) h = 0;
+          hh = String(h).padStart(2, "0");
+          mm = timeMatch[2];
+        }
+        registrationDeadline = `${y}-${m}-${d}T${hh}:${mm}`;
+      }
+    }
+  }
+
+  // Priority 2: Check for explicit "Hackathon Dates:" line
+  const eventLineMatch = cleanText.match(
+    /(?:hackathon\s*dates?|event\s*dates?|hackathon\s*begins\s*on|starts\s*on)[:\s\-–]*([^\n\r]+)/i
+  );
+  if (eventLineMatch) {
+    const raw = eventLineMatch[1];
+    const dMatch = raw.match(/(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]+(?:\s+\d{4})?)/i);
+    const timeMatch = raw.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (dMatch) {
+      let dateString = dMatch[1].replace(/(st|nd|rd|th)/gi, "").trim();
+      if (!/\d{4}/.test(dateString)) dateString = `${dateString} 2026`;
+      const parsed = new Date(dateString);
+      if (!isNaN(parsed.getTime())) {
+        const y = parsed.getFullYear();
+        const m = String(parsed.getMonth() + 1).padStart(2, "0");
+        const d = String(parsed.getDate()).padStart(2, "0");
+        let hh = "09";
+        let mm = "00";
+        if (timeMatch) {
+          let h = parseInt(timeMatch[1], 10);
+          if (timeMatch[3].toUpperCase() === "PM" && h < 12) h += 12;
+          if (timeMatch[3].toUpperCase() === "AM" && h === 12) h = 0;
+          hh = String(h).padStart(2, "0");
+          mm = timeMatch[2];
+        }
+        hackathonDate = `${y}-${m}-${d}T${hh}:${mm}`;
+      }
+    }
+  }
+
+  // Priority 3: General context window scan if not found via explicit lines
   const deadlineCandidates = foundDates.filter((f) => f.isDeadline);
-  if (deadlineCandidates.length > 0) {
+  if (!registrationDeadline && deadlineCandidates.length > 0) {
     registrationDeadline = normalizeDate(deadlineCandidates[0].date.toISOString(), "23:59");
   }
 
-  // Find event date candidates
-  const eventCandidates = foundDates.filter((f) => f.isEvent && f.date.getTime() !== deadlineCandidates[0]?.date.getTime());
-  if (eventCandidates.length > 0) {
-    hackathonDate = normalizeDate(eventCandidates[0].date.toISOString(), "09:00");
-    if (eventCandidates.length > 1) {
-      const distinctDays = Array.from(new Set(eventCandidates.map((e) => e.date.toISOString().slice(0, 10))));
-      if (distinctDays.length > 1) {
-        hasDateConflict = true;
-        dateConflictNote = `Multiple event/round dates identified in text (${distinctDays.join(", ")}). Primary date selected: ${distinctDays[0]}.`;
+  if (!hackathonDate) {
+    const eventCandidates = foundDates.filter((f) => f.isEvent && (!deadlineCandidates[0] || f.date.getTime() !== deadlineCandidates[0].date.getTime()));
+    if (eventCandidates.length > 0) {
+      hackathonDate = normalizeDate(eventCandidates[0].date.toISOString(), "09:00");
+      if (eventCandidates.length > 1) {
+        const distinctDays = Array.from(new Set(eventCandidates.map((e) => e.date.toISOString().slice(0, 10))));
+        if (distinctDays.length > 1) {
+          hasDateConflict = true;
+          dateConflictNote = `Multiple event/round dates identified in text (${distinctDays.join(", ")}). Primary date selected: ${distinctDays[0]}.`;
+        }
       }
-    }
-  } else {
-    // If no explicit event tag, take non-deadline dates
-    const otherDates = foundDates.filter((f) => !f.isDeadline);
-    if (otherDates.length > 0) {
-      // Pick the latest date or date after deadline
-      const sorted = otherDates.sort((a, b) => b.date.getTime() - a.date.getTime());
-      hackathonDate = normalizeDate(sorted[0].date.toISOString(), "09:00");
-      if (sorted.length > 1) {
-        hasDateConflict = true;
-        dateConflictNote = `Found multiple timeline dates (${sorted.map((s) => s.date.toISOString().slice(0, 10)).join(", ")}).`;
+    } else {
+      // If no explicit event tag, take non-deadline dates
+      const otherDates = foundDates.filter((f) => !f.isDeadline);
+      if (otherDates.length > 0) {
+        // Pick the latest date or date after deadline
+        const sorted = otherDates.sort((a, b) => b.date.getTime() - a.date.getTime());
+        hackathonDate = normalizeDate(sorted[0].date.toISOString(), "09:00");
+        if (sorted.length > 1) {
+          hasDateConflict = true;
+          dateConflictNote = `Found multiple timeline dates (${sorted.map((s) => s.date.toISOString().slice(0, 10)).join(", ")}).`;
+        }
+      } else if (foundDates.length > 0) {
+        hackathonDate = normalizeDate(foundDates[0].date.toISOString(), "09:00");
       }
-    } else if (foundDates.length > 0) {
-      hackathonDate = normalizeDate(foundDates[0].date.toISOString(), "09:00");
     }
   }
 
@@ -465,19 +570,37 @@ export function heuristicExtractHackathon(text: string): AiExtractedHackathon {
 
   // 7. Description Extraction
   let description: string | null = null;
-  const descCandidates = lines.filter(
-    (l) =>
-      l !== name &&
-      !roundLines.includes(l) &&
-      l.length >= 35 &&
-      !l.startsWith("http") &&
-      !/^(?:venue|location|fee|deadline|register|apply|dates|rounds|contact)/i.test(l)
-  );
 
-  if (descCandidates.length > 0) {
-    description = descCandidates.slice(0, 3).join("\n\n");
-  } else if (lines.length > 1) {
-    description = lines.slice(1, 3).join("\n\n");
+  // Strategy A: Sentences starting with "Presented by..." or "All that you need to know"
+  const presentedMatch = cleanText.match(/(?:Presented by|All that you need to know about)[^\n\r]+(?:\n[^\n\r]+){0,3}/i);
+  if (presentedMatch && presentedMatch[0].trim().length > 30) {
+    description = presentedMatch[0].trim();
+  }
+
+  // Strategy B: Section under "Overview" or "About"
+  if (!description) {
+    const overviewMatch = cleanText.match(/(?:Overview|About|About the Hackathon)[:\s\-–]*\n+([^\n\r]+(?:\n[^\n\r]+){0,3})/i);
+    if (overviewMatch && overviewMatch[1].trim().length > 30) {
+      description = overviewMatch[1].trim();
+    }
+  }
+
+  // Strategy C: Substantive paragraphs
+  if (!description) {
+    const descCandidates = lines.filter(
+      (l) =>
+        l !== name &&
+        !roundLines.includes(l) &&
+        l.length >= 35 &&
+        !l.startsWith("http") &&
+        !/^(?:venue|location|fee|deadline|register|apply|dates|rounds|contact)/i.test(l)
+    );
+
+    if (descCandidates.length > 0) {
+      description = descCandidates.slice(0, 3).join("\n\n");
+    } else if (lines.length > 1) {
+      description = lines.slice(1, 3).join("\n\n");
+    }
   }
 
   const warnings: string[] = [];
