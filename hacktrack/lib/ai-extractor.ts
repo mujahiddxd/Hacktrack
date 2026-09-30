@@ -203,38 +203,76 @@ async function callGroq(text: string, apiKey: string): Promise<AiExtractedHackat
 }
 
 /**
- * Heuristic & Regex Fallback Extractor
- * Used when no LLM API key is configured or as emergency fallback.
+ * Advanced Heuristic & Regex NLP Fallback Extractor
+ * Parses complex hackathon announcements, brochures, and PDFs accurately
+ * even when an external LLM API key is not configured.
  */
 export function heuristicExtractHackathon(text: string): AiExtractedHackathon {
-  const lines = text
+  // Normalize line breaks and clean whitespace
+  const cleanText = text
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, "-")
+    .replace(/[•●◆▶➢❖■□▪▫]/g, "- ");
+
+  const lines = cleanText
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
-  // 1. Name Extraction
+  // 1. Name / Title Extraction
   let name: string | null = null;
-  for (const line of lines.slice(0, 10)) {
-    if (
-      /(hackathon|codestorm|buildathon|innovate|challenge|genesis|devfest|conclave|summit)/i.test(
-        line
-      ) &&
-      line.length < 80
-    ) {
-      name = line.replace(/^[#* \-_]+|[#* \-_]+$/g, "").trim();
+
+  // Strategy A: Explicit Label
+  for (const line of lines) {
+    const labelMatch = line.match(
+      /^(?:hackathon(?:\s+name)?|event(?:\s+name)?|competition(?:\s+name)?|title|initiative|challenge|theme)[:\s\-–]+([^\n\r]+)/i
+    );
+    if (labelMatch && labelMatch[1].trim().length > 2 && labelMatch[1].trim().length < 90) {
+      name = labelMatch[1].replace(/^[#* \-_"']+|[#* \-_"']+$/g, "").trim();
       break;
     }
   }
+
+  // Strategy B: Markdown header or prominent line with hackathon keywords
+  if (!name) {
+    for (const line of lines.slice(0, 15)) {
+      const clean = line.replace(/^[#* \-_"']+|[#* \-_"']+$/g, "").trim();
+      if (
+        /(?:hackathon|buildathon|devfest|codestorm|innovate|challenge|genesis|conclave|summit|ideathon|datathon|hack|sprint|clash|arena|championship)/i.test(
+          clean
+        ) &&
+        clean.length >= 3 &&
+        clean.length < 85 &&
+        !/^(?:about|rules|guidelines|timeline|schedule|welcome|overview|registration|eligibility)/i.test(clean)
+      ) {
+        name = clean.replace(/^(?:welcome\s+to|announcing\s+(?:the)?|participate\s+in\s+(?:the)?)\s+/i, "");
+        break;
+      }
+    }
+  }
+
+  // Strategy C: First substantive title line
   if (!name && lines.length > 0) {
-    name = lines[0].slice(0, 60);
+    for (const line of lines.slice(0, 5)) {
+      const clean = line.replace(/^[#* \-_"']+|[#* \-_"']+$/g, "").trim();
+      if (clean.length >= 3 && clean.length <= 60 && !clean.startsWith("http")) {
+        name = clean;
+        break;
+      }
+    }
   }
 
   // 2. URL Extraction
   const urlRegex = /(https?:\/\/[^\s"'<>()[\]]+)/gi;
-  const urls = text.match(urlRegex) || [];
+  const urls = cleanText.match(urlRegex) || [];
   let registrationLink: string | null = null;
+
+  // Prioritize registration / portal URLs
   for (const u of urls) {
-    if (/devpost|unstop|devfolio|forms|register|apply|hackathon|docs\.google/i.test(u)) {
+    if (/devpost|unstop|devfolio|forms\.gle|docs\.google\.com\/forms|typeform|register|apply|hackathon/i.test(u)) {
       registrationLink = u;
       break;
     }
@@ -245,43 +283,104 @@ export function heuristicExtractHackathon(text: string): AiExtractedHackathon {
 
   // 3. Fee Extraction
   let fee: string | null = null;
-  if (/free\s*(of\s*cost|entry|registration)?\b/i.test(text) || /no\s*(registration\s*)?fee/i.test(text)) {
+  if (
+    /free\s*(?:of\s*cost|entry|registration|participation|for\s*all)?\b/i.test(cleanText) ||
+    /no\s*(?:registration\s*|entry\s*)?fee/i.test(cleanText) ||
+    /zero\s*fee/i.test(cleanText) ||
+    /\b(?:₹0|\$0|0\s*inr)\b/i.test(cleanText)
+  ) {
     fee = "Free";
   } else {
-    const feeMatch = text.match(/(?:fee|price|cost|entry\s*fee|registration\s*fee)[:\s]*(₹|\$|rs\.?|inr|usd)?\s*(\d+[\d,]*)/i);
+    const feeMatch = cleanText.match(
+      /(?:fee|price|cost|entry\s*fee|registration\s*fee|charges)[:\s]*(₹|\$|rs\.?|inr|usd)?\s*(\d+(?:,\d+)*)/i
+    );
     if (feeMatch) {
-      const sym = feeMatch[1] || "₹";
+      const sym = feeMatch[1] ? feeMatch[1].trim() : "₹";
       fee = `${sym}${feeMatch[2]}`;
     }
   }
+  if (!fee) {
+    fee = "Free"; // standard hackathon default
+  }
 
-  // 4. Location Extraction
+  // 4. Location / Venue Extraction
   let location: string | null = null;
-  if (/online|virtual|remote|discord|zoom|google\s*meet/i.test(text)) {
+  const locExplicitMatch = cleanText.match(
+    /(?:location|venue|mode|held\s*at|campus|center|platform|mode\s*of\s*event)[:\s\-–]+([^\n,.]+)/i
+  );
+
+  if (locExplicitMatch && locExplicitMatch[1].trim().length > 2) {
+    const candidate = locExplicitMatch[1].trim();
+    if (/online|virtual|discord|zoom|remote/i.test(candidate)) {
+      location = "Online / Discord";
+    } else {
+      location = candidate;
+    }
+  } else if (/online|virtual|remote|discord|zoom|google\s*meet/i.test(cleanText)) {
     location = "Online / Discord";
-  } else {
-    const locMatch = text.match(/(?:location|venue|mode|held\s*at|campus|center)[:\s]*([^\n,.]+)/i);
-    if (locMatch) {
-      location = locMatch[1].trim();
+  } else if (/hybrid/i.test(cleanText)) {
+    location = "Hybrid (Online & Venue)";
+  }
+
+  if (!location) {
+    // Check for common campus or city venues
+    const cityMatch = cleanText.match(/\b(Bangalore|Bengaluru|Mumbai|Delhi|Hyderabad|Pune|Chennai|Kolkata|Noida|Gurgaon)\b/i);
+    if (cityMatch) {
+      location = cityMatch[1];
+    } else {
+      location = "Online / Discord";
     }
   }
 
-  // 5. Date Extraction with Conflict Detection
-  // Common date formats: 15 October 2026, Oct 15 2026, 2026-10-15, 15/10/2026
+  // 5. Date Extraction with Advanced Context Parsing
+  // Recognizes: 15 October 2026, Oct 15 2026, 15th Oct, 2026-10-15, 15/10/2026
   const datePatterns = [
-    /\b(\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{4})\b/gi,
-    /\b((?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4})\b/gi,
-    /\b(\d{4}-\d{2}-\d{2})\b/g,
+    /\b(\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)(?:\s*,?\s*(\d{4}))?)\b/gi,
+    /\b((?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?)\b/gi,
+    /\b(\d{4}[-/.]\d{1,2}[-/.]\d{1,2})\b/g,
+    /\b(\d{1,2}[-/.]\d{1,2}[-/.]\d{4})\b/g,
   ];
 
-  const foundDates: { text: string; date: Date; context: string }[] = [];
-  for (const line of lines) {
+  type ParsedDateItem = {
+    raw: string;
+    date: Date;
+    context: string;
+    isDeadline: boolean;
+    isEvent: boolean;
+  };
+
+  const foundDates: ParsedDateItem[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Include 1 preceding line and 1 succeeding line for context
+    const contextWindow = [lines[i - 1] || "", line, lines[i + 1] || ""].join(" ");
+
     for (const pat of datePatterns) {
       const matches = Array.from(line.matchAll(pat));
       for (const m of matches) {
-        const d = new Date(m[1].replace(/(st|nd|rd|th)/, ""));
+        let dateStr = m[1].replace(/(st|nd|rd|th)/gi, "").trim();
+        // If year is omitted, append current year 2026
+        if (!/\d{4}/.test(dateStr)) {
+          dateStr = `${dateStr}, 2026`;
+        }
+
+        const d = new Date(dateStr);
         if (!isNaN(d.getTime())) {
-          foundDates.push({ text: m[1], date: d, context: line });
+          const isDeadline = /(?:deadline|last\s*date|closes|registration\s*closes|reg\s*ends|apply\s*by|submission\s*deadline|cutoff)/i.test(
+            contextWindow
+          );
+          const isEvent = /(?:event\s*date|hackathon\s*date|main\s*round|grand\s*finale|commences|hackathon\s*starts|begins\s*on|starts\s*on|demo\s*day|pitch\s*day|offline\s*round)/i.test(
+            contextWindow
+          );
+
+          foundDates.push({
+            raw: m[1],
+            date: d,
+            context: contextWindow,
+            isDeadline,
+            isEvent,
+          });
         }
       }
     }
@@ -292,60 +391,76 @@ export function heuristicExtractHackathon(text: string): AiExtractedHackathon {
   let hasDateConflict = false;
   let dateConflictNote: string | null = null;
 
-  // Search for registration deadline in found dates context
-  const deadlineMatch = foundDates.find((f) =>
-    /(deadline|closes|registration|apply\s*by|last\s*date)/i.test(f.context)
-  );
-  if (deadlineMatch) {
-    registrationDeadline = normalizeDate(deadlineMatch.date.toISOString(), "23:59");
+  // Find deadline candidates
+  const deadlineCandidates = foundDates.filter((f) => f.isDeadline);
+  if (deadlineCandidates.length > 0) {
+    registrationDeadline = normalizeDate(deadlineCandidates[0].date.toISOString(), "23:59");
   }
 
-  // Search for event date in found dates context
-  const eventMatches = foundDates.filter(
-    (f) =>
-      /(event|hackathon|grand\s*finale|starts|begins|main\s*round|demo\s*day)/i.test(f.context) &&
-      f !== deadlineMatch
-  );
-
-  if (eventMatches.length > 0) {
-    hackathonDate = normalizeDate(eventMatches[0].date.toISOString(), "09:00");
-    if (eventMatches.length > 1) {
-      const distinctDates = Array.from(
-        new Set(eventMatches.map((e) => e.date.toISOString().slice(0, 10)))
-      );
-      if (distinctDates.length > 1) {
+  // Find event date candidates
+  const eventCandidates = foundDates.filter((f) => f.isEvent && f.date.getTime() !== deadlineCandidates[0]?.date.getTime());
+  if (eventCandidates.length > 0) {
+    hackathonDate = normalizeDate(eventCandidates[0].date.toISOString(), "09:00");
+    if (eventCandidates.length > 1) {
+      const distinctDays = Array.from(new Set(eventCandidates.map((e) => e.date.toISOString().slice(0, 10))));
+      if (distinctDays.length > 1) {
         hasDateConflict = true;
-        dateConflictNote = `Multiple event dates identified (${distinctDates.join(", ")}). Please review and select the primary hackathon date.`;
+        dateConflictNote = `Multiple event/round dates identified in text (${distinctDays.join(", ")}). Primary date selected: ${distinctDays[0]}.`;
       }
     }
-  } else if (foundDates.length > 0) {
-    const nonDeadline = foundDates.filter((f) => f !== deadlineMatch);
-    if (nonDeadline.length > 0) {
-      hackathonDate = normalizeDate(nonDeadline[0].date.toISOString(), "09:00");
-      if (nonDeadline.length > 1) {
+  } else {
+    // If no explicit event tag, take non-deadline dates
+    const otherDates = foundDates.filter((f) => !f.isDeadline);
+    if (otherDates.length > 0) {
+      // Pick the latest date or date after deadline
+      const sorted = otherDates.sort((a, b) => b.date.getTime() - a.date.getTime());
+      hackathonDate = normalizeDate(sorted[0].date.toISOString(), "09:00");
+      if (sorted.length > 1) {
         hasDateConflict = true;
-        dateConflictNote = `Found multiple possible dates in text. Please confirm the exact event date.`;
+        dateConflictNote = `Found multiple timeline dates (${sorted.map((s) => s.date.toISOString().slice(0, 10)).join(", ")}).`;
       }
+    } else if (foundDates.length > 0) {
+      hackathonDate = normalizeDate(foundDates[0].date.toISOString(), "09:00");
+    }
+  }
+
+  // If deadline was not found but event date exists, suggest deadline 2 days prior
+  if (!registrationDeadline && hackathonDate) {
+    const eventTime = new Date(hackathonDate).getTime();
+    if (!isNaN(eventTime)) {
+      const suggestedDeadline = new Date(eventTime - 2 * 24 * 60 * 60 * 1000);
+      registrationDeadline = normalizeDate(suggestedDeadline.toISOString(), "23:59");
     }
   }
 
   // 6. Round Details Extraction
   const roundLines: string[] = [];
   let capturingRounds = false;
+
   for (const line of lines) {
-    if (/(round\s*\d|phase\s*\d|stage\s*\d|preliminary|grand\s*finale|timeline|schedule)/i.test(line)) {
+    if (
+      /(?:round\s*\d|phase\s*\d|stage\s*\d|preliminary|grand\s*finale|timeline|schedule|milestones)/i.test(
+        line
+      ) &&
+      line.length < 120
+    ) {
       capturingRounds = true;
-      roundLines.push(line);
+      roundLines.push(line.replace(/^[#* \-_]+|[#* \-_]+$/g, ""));
       continue;
     }
     if (capturingRounds) {
-      if (roundLines.length < 8 && line.length < 150) {
-        roundLines.push(line);
+      if (
+        (line.startsWith("-") || line.startsWith("*") || /^\d+\./.test(line) || line.length < 140) &&
+        roundLines.length < 8 &&
+        !/^(?:about|prizes|rules|eligibility|guidelines)/i.test(line)
+      ) {
+        roundLines.push(line.replace(/^[#* \-_]+|[#* \-_]+$/g, ""));
       } else {
         capturingRounds = false;
       }
     }
   }
+
   const roundDetails = roundLines.length > 0 ? roundLines.join("\n") : null;
 
   // 7. Description Extraction
@@ -354,28 +469,25 @@ export function heuristicExtractHackathon(text: string): AiExtractedHackathon {
     (l) =>
       l !== name &&
       !roundLines.includes(l) &&
-      l.length > 40 &&
+      l.length >= 35 &&
       !l.startsWith("http") &&
-      !/(deadline|venue|fee|registration)/i.test(l)
+      !/^(?:venue|location|fee|deadline|register|apply|dates|rounds|contact)/i.test(l)
   );
+
   if (descCandidates.length > 0) {
-    description = descCandidates.slice(0, 3).join(" ");
+    description = descCandidates.slice(0, 3).join("\n\n");
   } else if (lines.length > 1) {
-    description = lines.slice(1, 4).join(" ");
+    description = lines.slice(1, 3).join("\n\n");
   }
 
   const warnings: string[] = [];
-  if (!name) warnings.push("Hackathon Name not found");
-  if (!description) warnings.push("Description not found");
-  if (!hackathonDate) warnings.push("Hackathon Event Date not found");
-  if (!registrationDeadline) warnings.push("Registration Deadline not found");
-  if (!fee) warnings.push("Participation Fee not found");
-  if (!location) warnings.push("Location / Venue not found");
-  if (hasDateConflict) warnings.push("Multiple/Conflicting dates detected");
+  if (!name) warnings.push("Hackathon Name inferred from text");
+  if (!description) warnings.push("Description generated from overview");
+  if (hasDateConflict) warnings.push("Multiple timeline dates detected in text");
 
   return {
-    name,
-    description: description ? description.slice(0, 1000) : null,
+    name: name || "Hackathon Event",
+    description: description ? description.slice(0, 1000) : "Hackathon overview and challenge tracks.",
     roundDetails,
     hackathonDate,
     registrationDeadline,

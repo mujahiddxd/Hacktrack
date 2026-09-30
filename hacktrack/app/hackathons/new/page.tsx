@@ -1,14 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createHackathon } from "@/actions/hackathons";
+import { createHackathon, checkHackathonDateConflict, type DateConflictCheckResult } from "@/actions/hackathons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { DateConflictAlert } from "@/components/DateConflictAlert";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   ArrowLeft,
   PlusCircle,
@@ -27,17 +29,74 @@ export default function NewHackathonPage() {
   const [error, setError] = useState<string | null>(null);
   const [enableBroadcast, setEnableBroadcast] = useState(true);
 
+  // Date conflict state
+  const [hackathonDate, setHackathonDate] = useState("");
+  const [isCheckingConflict, setIsCheckingConflict] = useState(false);
+  const [conflictData, setConflictData] = useState<DateConflictCheckResult | null>(null);
+  const [showConflictConfirm, setShowConflictConfirm] = useState(false);
+  const [pendingFormData, setPendingFormData] = useState<FormData | null>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Suggested default broadcast datetime: tomorrow at 09:00 AM
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
   tomorrow.setHours(9, 0, 0, 0);
   const defaultBroadcastDate = tomorrow.toISOString().slice(0, 16);
 
+  const handleDateChange = (val: string) => {
+    setHackathonDate(val);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    if (!val || val.trim().length < 10) {
+      setConflictData(null);
+      setIsCheckingConflict(false);
+      return;
+    }
+
+    setIsCheckingConflict(true);
+    debounceTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await checkHackathonDateConflict(val);
+        setConflictData(res);
+        if (res.hasConflict) {
+          toast.warning(
+            `Date Conflict: A hackathon is already registered on ${res.dateFormatted || "this date"}!`,
+            { id: "date-conflict-warning" }
+          );
+        }
+      } catch (err) {
+        console.error("Conflict check failed:", err);
+      } finally {
+        setIsCheckingConflict(false);
+      }
+    }, 350);
+  };
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setIsSubmitting(true);
     setError(null);
 
     const formData = new FormData(e.currentTarget);
+
+    // If a conflict was detected and user hasn't overridden it yet, confirm first
+    if (conflictData?.hasConflict) {
+      setPendingFormData(formData);
+      setShowConflictConfirm(true);
+      return;
+    }
+
+    await executeSubmit(formData);
+  }
+
+  async function executeSubmit(formData: FormData, allowDuplicate = false) {
+    setIsSubmitting(true);
+    setError(null);
+
+    if (allowDuplicate) {
+      formData.set("allowDuplicateDate", "true");
+    }
+
     const res = await createHackathon(formData);
 
     if (res?.error) {
@@ -54,6 +113,13 @@ export default function NewHackathonPage() {
       router.push("/hackathons");
     }
   }
+
+  const handleConfirmDuplicate = () => {
+    setShowConflictConfirm(false);
+    if (pendingFormData) {
+      executeSubmit(pendingFormData, true);
+    }
+  };
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -122,21 +188,36 @@ export default function NewHackathonPage() {
               helperText="Breakdown of submission stages and timelines"
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <Input
-                label="Hackathon Event Date"
-                name="hackathonDate"
-                type="datetime-local"
-                required
-                helperText="When the hackathon officially commences"
-              />
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <Input
+                    label="Hackathon Event Date"
+                    name="hackathonDate"
+                    type="datetime-local"
+                    required
+                    value={hackathonDate}
+                    onChange={(e) => handleDateChange(e.target.value)}
+                    helperText="When the hackathon officially commences"
+                  />
+                </div>
 
-              <Input
-                label="Registration Deadline"
-                name="registrationDeadline"
-                type="datetime-local"
-                required
-                helperText="Final cutoff for participant sign-ups"
+                <Input
+                  label="Registration Deadline"
+                  name="registrationDeadline"
+                  type="datetime-local"
+                  required
+                  helperText="Final cutoff for participant sign-ups"
+                />
+              </div>
+
+              {/* Real-time date conflict warning alert */}
+              <DateConflictAlert
+                isChecking={isCheckingConflict}
+                hasConflict={conflictData?.hasConflict ?? false}
+                conflicts={conflictData?.conflicts ?? []}
+                dateFormatted={conflictData?.dateFormatted}
+                checkedDate={hackathonDate}
               />
             </div>
 
@@ -272,6 +353,18 @@ export default function NewHackathonPage() {
           </div>
         </form>
       </div>
+
+      {/* Date Conflict Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showConflictConfirm}
+        onClose={() => setShowConflictConfirm(false)}
+        onConfirm={handleConfirmDuplicate}
+        title="Hackathon Date Already Registered"
+        description={`You already have active hackathon programming registered on ${conflictData?.dateFormatted || "this date"} (${conflictData?.conflicts.map((c) => `"${c.name}"`).join(", ")}). Are you sure you want to schedule another hackathon on the same date?`}
+        confirmLabel="Proceed Anyway"
+        confirmVariant="primary"
+        isLoading={isSubmitting}
+      />
     </div>
   );
 }
