@@ -2,8 +2,9 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { recordActivity } from "@/lib/activity";
 
 const ParticipantSchema = z.object({
   hackathonId: z.string().min(1, "Hackathon ID is required"),
@@ -11,16 +12,9 @@ const ParticipantSchema = z.object({
   email: z.string().email("Valid Gmail or email address is required"),
 });
 
-async function requireAdmin() {
-  const session = await getSession();
-  if (!session) {
-    throw new Error("Unauthorized. Please log in as Admin.");
-  }
-  return session;
-}
 
 export async function addParticipant(formData: FormData) {
-  await requireAdmin();
+  const { userId } = await requireUser();
 
   const hackathonId = formData.get("hackathonId") as string;
   const name = formData.get("name") as string;
@@ -32,6 +26,14 @@ export async function addParticipant(formData: FormData) {
   }
 
   try {
+    const hackathon = await prisma.hackathon.findFirst({
+      where: { id: validated.data.hackathonId, userId },
+      select: { id: true },
+    });
+    if (!hackathon) {
+      return { error: "Hackathon not found." };
+    }
+
     // Check if participant already exists in this hackathon
     const existing = await prisma.participant.findFirst({
       where: {
@@ -70,6 +72,10 @@ export async function addParticipant(formData: FormData) {
       });
     }
 
+    await recordActivity([
+      { userId, kind: "PARTICIPANT_ADDED", refId: participant.id, occurredAt: participant.createdAt },
+    ]);
+
     revalidatePath(`/hackathons/${hackathonId}`);
     return { success: true, participant };
   } catch (err: unknown) {
@@ -78,7 +84,7 @@ export async function addParticipant(formData: FormData) {
 }
 
 export async function updateParticipant(id: string, formData: FormData) {
-  await requireAdmin();
+  const { userId } = await requireUser();
 
   const name = formData.get("name") as string;
   const email = formData.get("email") as string;
@@ -91,6 +97,14 @@ export async function updateParticipant(id: string, formData: FormData) {
   }
 
   try {
+    const owned = await prisma.participant.findFirst({
+      where: { id, hackathon: { userId } },
+      select: { id: true },
+    });
+    if (!owned) {
+      return { error: "Participant not found." };
+    }
+
     const updated = await prisma.participant.update({
       where: { id },
       data: {
@@ -107,11 +121,14 @@ export async function updateParticipant(id: string, formData: FormData) {
 }
 
 export async function deleteParticipant(id: string, hackathonId: string) {
-  await requireAdmin();
+  const { userId } = await requireUser();
   try {
-    await prisma.participant.delete({
-      where: { id },
+    const deleted = await prisma.participant.deleteMany({
+      where: { id, hackathon: { userId } },
     });
+    if (deleted.count === 0) {
+      return { error: "Participant not found." };
+    }
 
     revalidatePath(`/hackathons/${hackathonId}`);
     return { success: true };

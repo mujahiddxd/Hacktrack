@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
+import { prisma } from "@/lib/prisma";
 
 const SECRET_KEY = new TextEncoder().encode(
   process.env.JWT_SECRET || "hacktrack-neubrutalism-super-secure-key-2026"
@@ -8,10 +9,15 @@ const SECRET_KEY = new TextEncoder().encode(
 
 const SESSION_COOKIE_NAME = "hacktrack_session";
 
-export interface AdminSession {
-  adminId: string;
+export interface UserSession {
+  userId: string;
   email: string;
+  /** Mirrors User.needsOnboarding so the proxy can route new users without a DB lookup */
+  needsOnboarding?: boolean;
 }
+
+/** Read (and cleared) by the client to show the post-sign-in splash once. Not httpOnly on purpose. */
+export const WELCOME_COOKIE_NAME = "hacktrack_welcome";
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = await bcrypt.genSalt(10);
@@ -25,7 +31,7 @@ export async function verifyPassword(
   return bcrypt.compare(password, hashed);
 }
 
-export async function signSessionToken(payload: AdminSession): Promise<string> {
+export async function signSessionToken(payload: UserSession): Promise<string> {
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -35,19 +41,22 @@ export async function signSessionToken(payload: AdminSession): Promise<string> {
 
 export async function verifySessionToken(
   token: string
-): Promise<AdminSession | null> {
+): Promise<UserSession | null> {
   try {
     const { payload } = await jwtVerify(token, SECRET_KEY);
+    // Tokens issued before multi-user support carried `adminId` instead of `userId`.
+    if (typeof payload.userId !== "string") return null;
     return {
-      adminId: payload.adminId as string,
+      userId: payload.userId as string,
       email: payload.email as string,
+      needsOnboarding: payload.needsOnboarding === true,
     };
   } catch {
     return null;
   }
 }
 
-export async function createSession(payload: AdminSession) {
+export async function createSession(payload: UserSession) {
   const token = await signSessionToken(payload);
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE_NAME, token, {
@@ -59,7 +68,19 @@ export async function createSession(payload: AdminSession) {
   });
 }
 
-export async function getSession(): Promise<AdminSession | null> {
+/** Flags the next page load to play the welcome splash (sign-in, register, onboarding done). */
+export async function markFreshSignIn(kind: "new" | "returning" = "returning") {
+  const cookieStore = await cookies();
+  cookieStore.set(WELCOME_COOKIE_NAME, kind, {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60,
+  });
+}
+
+export async function getSession(): Promise<UserSession | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   if (!token) return null;
@@ -69,4 +90,23 @@ export async function getSession(): Promise<AdminSession | null> {
 export async function destroySession() {
   const cookieStore = await cookies();
   cookieStore.delete(SESSION_COOKIE_NAME);
+}
+
+/**
+ * Resolves the signed-in user for server actions and pages. Verifies the account
+ * still exists so sessions of deleted accounts stop working immediately.
+ */
+export async function requireUser(): Promise<UserSession> {
+  const session = await getSession();
+  if (!session) {
+    throw new Error("Unauthorized. Please log in.");
+  }
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: { id: true, email: true },
+  });
+  if (!user) {
+    throw new Error("Unauthorized. Your account no longer exists.");
+  }
+  return { userId: user.id, email: user.email };
 }

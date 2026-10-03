@@ -1,53 +1,139 @@
 @import "tailwindcss";
 
+/* ── Theme tokens ──────────────────────────────────────────────
+   Semantic colours live in --ht-* custom properties so light and dark can differ deliberately.
+   Theme resolution: <html data-theme="light|dark"> is set before first paint by the inline script in
+   app/layout.tsx (lib/theme.ts). Without it (script blocked), the OS preference applies via the media query.
+   Accents (yellow, mint, blue, coral) keep the same hex in both themes so their meaning never changes;
+   text placed on yellow/mint is always ink (--ht-on-accent). */
+:root {
+  color-scheme: light;
+  --ht-canvas: #FEFDF8;      /* page background */
+  --ht-surface: #FFFFFF;     /* cards, inputs, menus */
+  --ht-quiet: #F4F4F5;       /* quiet fills, hovers, inactive */
+  --ht-subtle: #E4E4E7;      /* soft dividers, empty tracks */
+  --ht-ink: #121212;         /* primary text + brutal borders */
+  --ht-body: #52525B;        /* secondary paragraph text */
+  --ht-muted: #71717A;       /* captions, helper text */
+  --ht-faint: #A1A1AA;       /* decorative icons only (not for text) */
+  --ht-placeholder: #71717A;
+  --ht-shadow: #121212;      /* hard offset shadow */
+  --ht-focus: #2196F3;
+  --ht-on-accent: #121212;   /* text on yellow / mint (both themes) */
+  --ht-tint-coral: #FEF2F2;  /* error / destructive panels */
+  --ht-tint-blue: #DDEBFF;
+  --ht-tint-mint: #DCFCE7;
+  --ht-tint-yellow: #FFF9C4;
+  --ht-illus-line: #D4D4D8;  /* placeholder lines in illustrations */
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ht-canvas: #141418;
+  --ht-surface: #1E1E24;
+  --ht-quiet: #2A2A31;
+  --ht-subtle: #3A3A43;
+  --ht-ink: #F2EFE6;
+  --ht-body: #C9C6BE;
+  --ht-muted: #A3A0A8;
+  --ht-faint: #75737B;
+  --ht-placeholder: #9A97A0;
+  --ht-shadow: #CFCABD;
+  --ht-focus: #64B5F6;
+  --ht-on-accent: #121212;
+  --ht-tint-coral: #3A1D21;
+  --ht-tint-blue: #16273C;
+  --ht-tint-mint: #102E1E;
+  --ht-tint-yellow: #36310F;
+  --ht-illus-line: #4A4A54;
+}
+
+/* No script (or before it runs in exotic cases): follow the OS */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --ht-canvas: #141418;
+    --ht-surface: #1E1E24;
+    --ht-quiet: #2A2A31;
+    --ht-subtle: #3A3A43;
+    --ht-ink: #F2EFE6;
+    --ht-body: #C9C6BE;
+    --ht-muted: #A3A0A8;
+    --ht-faint: #75737B;
+    --ht-placeholder: #9A97A0;
+    --ht-shadow: #CFCABD;
+    --ht-focus: #64B5F6;
+    --ht-on-accent: #121212;
+    --ht-tint-coral: #3A1D21;
+    --ht-tint-blue: #16273C;
+    --ht-tint-mint: #102E1E;
+    --ht-tint-yellow: #36310F;
+    --ht-illus-line: #4A4A54;
+  }
+}
+
+/* Tailwind utilities backed by the tokens: bg-canvas, bg-surface, text-ink, border-ink, text-muted, … */
+@theme inline {
+  --color-canvas: var(--ht-canvas);
+  --color-surface: var(--ht-surface);
+  --color-quiet: var(--ht-quiet);
+  --color-subtle: var(--ht-subtle);
+  --color-ink: var(--ht-ink);
+  --color-body: var(--ht-body);
+  --color-muted: var(--ht-muted);
+  --color-faint: var(--ht-faint);
+  --color-on-accent: var(--ht-on-accent);
+  --color-tint-coral: var(--ht-tint-coral);
+  --color-tint-blue: var(--ht-tint-blue);
+  --color-tint-mint: var(--ht-tint-mint);
+  --color-tint-yellow: var(--ht-tint-yellow);
+
+  --shadow-brutal-sm: 2px 2px 0px var(--ht-shadow);
+  --shadow-brutal: 4px 4px 0px var(--ht-shadow);
+  --shadow-brutal-lg: 6px 6px 0px var(--ht-shadow);
+  --shadow-brutal-xl: 8px 8px 0px var(--ht-shadow);
+}
+
+/* Fixed brand accents (same in both themes) */
 @theme {
-  --color-canvas: #FEFDF8;
   --color-primary-yellow: #FFEB3B;
   --color-secondary-coral: #FF5252;
   --color-tertiary-blue: #2196F3;
   --color-accent-mint: #00E676;
-  --color-neutral-dark: #121212;
-  --color-neutral-muted: #71717A;
-  --color-neutral-light: #F4F4F5;
-
-  --shadow-brutal-sm: 2px 2px 0px #121212;
-  --shadow-brutal: 4px 4px 0px #121212;
-  --shadow-brutal-lg: 6px 6px 0px #121212;
-  --shadow-brutal-xl: 8px 8px 0px #121212;
-}
-
-:root {
-  --background: #FEFDF8;
-  --foreground: #121212;
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
+  background-color: var(--ht-canvas);
+  color: var(--ht-ink);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
 }
 
+::placeholder {
+  color: var(--ht-placeholder);
+  opacity: 1;
+}
+
 /* Custom Neubrutalist Component Utilities */
 .brutal-border {
-  border: 3px solid #121212;
+  border: 3px solid var(--ht-ink);
 }
 
 .brutal-border-2 {
-  border: 2px solid #121212;
+  border: 2px solid var(--ht-ink);
 }
 
 .brutal-shadow {
-  box-shadow: 4px 4px 0px #121212;
+  box-shadow: 4px 4px 0px var(--ht-shadow);
 }
 
 .brutal-shadow-sm {
-  box-shadow: 2px 2px 0px #121212;
+  box-shadow: 2px 2px 0px var(--ht-shadow);
 }
 
 .brutal-shadow-lg {
-  box-shadow: 6px 6px 0px #121212;
+  box-shadow: 6px 6px 0px var(--ht-shadow);
 }
 
 .brutal-btn {
@@ -55,8 +141,8 @@ body {
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  border: 3px solid #121212;
-  box-shadow: 4px 4px 0px #121212;
+  border: 3px solid var(--ht-ink);
+  box-shadow: 4px 4px 0px var(--ht-shadow);
   transition: all 0.15s ease-out;
   cursor: pointer;
   user-select: none;
@@ -64,41 +150,48 @@ body {
 
 .brutal-btn:hover {
   transform: translate(-1px, -1px);
-  box-shadow: 5px 5px 0px #121212;
+  box-shadow: 5px 5px 0px var(--ht-shadow);
 }
 
 .brutal-btn:active {
   transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0px #121212;
+  box-shadow: 1px 1px 0px var(--ht-shadow);
 }
 
 .brutal-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
   transform: none;
-  box-shadow: 2px 2px 0px #121212;
+  box-shadow: 2px 2px 0px var(--ht-shadow);
 }
 
 .brutal-card {
-  background-color: #FFFFFF;
-  border: 3px solid #121212;
-  box-shadow: 4px 4px 0px #121212;
+  background-color: var(--ht-surface);
+  color: var(--ht-ink);
+  border: 3px solid var(--ht-ink);
+  box-shadow: 4px 4px 0px var(--ht-shadow);
 }
 
 .brutal-input {
   width: 100%;
-  border: 3px solid #121212;
-  background-color: #FFFFFF;
+  border: 3px solid var(--ht-ink);
+  background-color: var(--ht-surface);
   padding: 0.625rem 0.875rem;
   font-weight: 500;
-  color: #121212;
+  color: var(--ht-ink);
   outline: none;
   transition: all 0.15s ease;
 }
 
 .brutal-input:focus {
-  box-shadow: 3px 3px 0px #121212;
+  box-shadow: 3px 3px 0px var(--ht-shadow);
   outline: none;
+}
+
+.brutal-input:disabled {
+  background-color: var(--ht-quiet);
+  color: var(--ht-muted);
+  cursor: not-allowed;
 }
 
 .brutal-badge {
@@ -110,6 +203,214 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  border: 2px solid #121212;
-  box-shadow: 2px 2px 0px #121212;
+  border: 2px solid var(--ht-ink);
+  box-shadow: 2px 2px 0px var(--ht-shadow);
+}
+
+/* ── Accessibility: one consistent keyboard focus ring ── */
+:focus-visible {
+  outline: 3px solid var(--ht-focus);
+  outline-offset: 2px;
+}
+
+/* ── Ambient background: slow-drifting code & maths glyphs ── */
+@keyframes ht-drift {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) rotate(var(--ht-rot, 0deg));
+  }
+  50% {
+    transform: translate3d(var(--ht-dx, 10px), var(--ht-dy, -22px), 0)
+      rotate(calc(var(--ht-rot, 0deg) + 8deg));
+  }
+}
+
+.ht-floater {
+  animation: ht-drift var(--ht-dur, 20s) ease-in-out infinite;
+  animation-delay: var(--ht-delay, 0s);
+  will-change: transform;
+}
+
+/* ── Loading screen ── */
+/* The tile "presses" into its shadow like a key, slowly and evenly */
+@keyframes ht-press {
+  0%, 100% { transform: translate(0, 0); box-shadow: 6px 6px 0 var(--ht-shadow); }
+  50% { transform: translate(3px, 3px); box-shadow: 3px 3px 0 var(--ht-shadow); }
+}
+
+/* Fills quickly at first, then slows near the end so it never looks stuck at 100% */
+@keyframes ht-fill {
+  0% { width: 4%; }
+  60% { width: 72%; }
+  100% { width: 92%; }
+}
+
+@keyframes ht-step-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ht-progress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+
+@keyframes ht-fade-out {
+  to { opacity: 0; visibility: hidden; }
+}
+
+.ht-press { animation: ht-press 1.6s ease-in-out infinite; }
+.ht-fill { width: 4%; animation: ht-fill 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+.ht-step-in { animation: ht-step-in 0.3s ease-out; }
+.ht-progress { animation: ht-progress 1.3s ease-in-out infinite; }
+.ht-fade-out { animation: ht-fade-out 0.35s ease-in forwards; }
+
+/* Sign-in splash: blinking terminal caret after the running step, and "Loading..." dots */
+@keyframes ht-blink {
+  50% { opacity: 0; }
+}
+
+@keyframes ht-dots {
+  0% { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75%, 100% { content: "..."; }
+}
+
+.ht-caret::after {
+  content: "▋";
+  margin-left: 0.25rem;
+  color: #FFEB3B;
+  animation: ht-blink 1s steps(1) infinite;
+}
+
+.ht-dots::after {
+  content: "...";
+  display: inline-block;
+  width: 1.5em;
+  text-align: left;
+  animation: ht-dots 1.2s steps(1) infinite;
+}
+
+/* ── Home: entrance + scroll reveal ── */
+@keyframes ht-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ht-rise {
+  animation: ht-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--ht-delay, 0s);
+}
+
+/* Sections ease in as they scroll into view. Browsers without scroll timelines just show them. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .ht-reveal {
+      animation: ht-rise linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 40%;
+    }
+  }
+}
+
+/* ── Home: "How HackTrack works" walkthrough (components/home/HowItWorksMotion.tsx) ──
+   Each element carries an inline `animation` with an absolute delay from one timeline.
+   Base styles are the finished state; keyframes animate FROM the start state.
+   The controller toggles data-play, which pauses or resumes every element together. */
+.ht-wt[data-play="paused"] * {
+  animation-play-state: paused !important;
+}
+
+.ht-wt svg * {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.ht-wt .wt-origin-top { transform-origin: 50% 0; }
+.ht-wt .wt-origin-bottom { transform-origin: 50% 100%; }
+
+.wt-card {
+  transition: transform 0.18s ease-out, box-shadow 0.18s ease-out;
+}
+@media (hover: hover) {
+  .wt-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 5px 7px 0 var(--ht-shadow);
+  }
+}
+
+@keyframes wt-show { from { opacity: 0; } to { opacity: 1; } }
+@keyframes wt-hide { from { opacity: 1; } to { opacity: 0; } }
+@keyframes wt-fade-in { from { opacity: 0; } }
+@keyframes wt-rise { from { opacity: 0; transform: translateY(10px); } }
+@keyframes wt-rise-sm { from { opacity: 0; transform: translateY(8px) scale(0.9); } }
+@keyframes wt-slide-in { from { opacity: 0; transform: translateX(-8px); } }
+@keyframes wt-from { from { transform: translate(var(--fx, 0), var(--fy, 0)); } }
+@keyframes wt-rotate { from { transform: rotate(0deg); } }
+
+@keyframes wt-pop {
+  0% { opacity: 0; transform: scale(0.6); }
+  70% { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Short, restrained sparkle that ends hidden */
+@keyframes wt-spark {
+  0% { opacity: 0; transform: scale(0.2); }
+  40% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.8); }
+}
+
+@keyframes wt-flash {
+  0% { opacity: 0; }
+  25%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Selection ring: two cells, pause on the taken date, then settle on a free one */
+@keyframes wt-cal-select {
+  0% { opacity: 0; transform: translateX(-60px); animation-timing-function: ease-out; }
+  10% { opacity: 1; transform: translateX(-60px); animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1); }
+  25% { transform: translateX(-40px); animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1); }
+  40% { transform: translateX(-20px); }
+  72% { transform: translateX(-20px); animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1); }
+  88%, 100% { opacity: 1; transform: translateX(0); }
+}
+
+/* The message folds down into the envelope and disappears behind its front */
+@keyframes wt-letter {
+  0% { opacity: 1; transform: translateY(0) scaleY(1); }
+  60% { opacity: 1; transform: translateY(24px) scaleY(0.55); }
+  100% { opacity: 0; transform: translateY(32px) scaleY(0.4); }
+}
+
+@keyframes wt-flap { from { transform: scaleY(0); } }
+
+/* Indicator travels the full connector, visible only while moving */
+@keyframes wt-travel {
+  0% { opacity: 0; transform: translateX(0); }
+  15% { opacity: 1; }
+  85% { opacity: 1; transform: translateX(100%); }
+  100% { opacity: 0; transform: translateX(100%); }
+}
+
+/* The Home walkthrough deliberately plays even with reduced motion (product decision); only the hero entrance is skipped */
+@media (prefers-reduced-motion: reduce) {
+  .ht-rise {
+    animation: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ht-caret::after,
+  .ht-dots::after,
+  .ht-floater,
+  .ht-press,
+  .ht-progress,
+  .ht-step-in {
+    animation: none !important;
+  }
+  .ht-fill {
+    animation: none !important;
+    width: 70%;
+  }
 }

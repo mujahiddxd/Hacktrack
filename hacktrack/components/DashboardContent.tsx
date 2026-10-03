@@ -3,7 +3,19 @@
 import * as React from "react";
 import { useMemo } from "react";
 import Link from "next/link";
-import { Users, Plus, Sparkles, CalendarPlus, Mail } from "lucide-react";
+import {
+  Users,
+  Sparkles,
+  CalendarPlus,
+  CalendarDays,
+  Send,
+  CheckCheck,
+  Trophy,
+  ArrowRight,
+  AlertTriangle,
+} from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { StreakDeck } from "@/components/streaks/StreakDeck";
 
 type Hackathon = {
   id: string;
@@ -35,6 +47,7 @@ interface DashboardContentProps {
   scheduledMessagesCount?: number;
   sentMessagesCount?: number;
   googleAccount?: GoogleStatus;
+  userName?: string | null;
 }
 
 /** Formats date into short uppercase "OCT 12" */
@@ -66,21 +79,89 @@ function getSubtitle(hackathon: Hackathon): string {
   return parts.join(" · ");
 }
 
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function HackathonCard({ hackathon, accent }: { hackathon: Hackathon; accent: "blue" | "mint" }) {
+  return (
+    <Link
+      href={`/hackathons/${hackathon.id}`}
+      className="group flex h-full flex-col justify-between rounded-xl border-2 border-ink bg-surface p-5 shadow-brutal-sm transition-all duration-150 hover:-translate-y-1 hover:shadow-brutal"
+    >
+      <div className="min-w-0">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <span
+            className={`rounded-md border-2 border-ink px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider shadow-[1.5px_1.5px_0px_var(--ht-shadow)] ${
+              accent === "mint" ? "bg-[#00E676] text-on-accent" : "bg-[#2196F3] text-white"
+            }`}
+          >
+            Upcoming
+          </span>
+          <span className="font-mono text-xs font-black uppercase tracking-wider text-ink" suppressHydrationWarning>
+            {formatShortDate(hackathon.hackathonDate)}
+          </span>
+        </div>
+
+        <h3 className="mb-1 line-clamp-1 text-lg font-black tracking-tight text-ink group-hover:underline">
+          {hackathon.name}
+        </h3>
+        <p className="mb-4 line-clamp-2 text-xs font-medium text-muted" suppressHydrationWarning>
+          {getSubtitle(hackathon)}
+        </p>
+      </div>
+
+      <div className="flex items-center justify-between border-t border-ink/15 pt-3 text-xs font-bold text-ink">
+        <span className="flex items-center gap-1.5">
+          <Users className="h-3.5 w-3.5 stroke-[2.2]" />
+          {hackathon._count?.participants || 0} participants
+        </span>
+        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+      </div>
+    </Link>
+  );
+}
+
+function StatTile({
+  icon: Icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: number;
+  tone: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border-2 border-ink bg-surface p-4 shadow-brutal-sm">
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border-2 border-ink ${tone}`}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-2xl font-black leading-none tracking-tight text-ink">{value}</p>
+        <p className="mt-1 truncate text-xs font-bold text-muted">{label}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardContent({
   allHackathons,
+  scheduledMessagesCount = 0,
+  sentMessagesCount = 0,
+  googleAccount,
+  userName,
 }: DashboardContentProps) {
-  // Current date for hero header badge e.g. "THURSDAY, OCTOBER 1"
   const currentDateLabel = useMemo(() => {
     return new Date()
-      .toLocaleDateString("en-US", {
-        weekday: "long",
-        month: "long",
-        day: "numeric",
-      })
+      .toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
       .toUpperCase();
   }, []);
 
-  // Filter upcoming active hackathons: hackathonDate >= today && status === "ACTIVE"
   const today = useMemo(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
@@ -90,11 +171,7 @@ export default function DashboardContent({
   const upcomingHackathons = useMemo(() => {
     return allHackathons
       .filter((h) => new Date(h.hackathonDate) >= today && h.status === "ACTIVE")
-      .sort(
-        (a, b) =>
-          new Date(a.hackathonDate).getTime() -
-          new Date(b.hackathonDate).getTime()
-      );
+      .sort((a, b) => new Date(a.hackathonDate).getTime() - new Date(b.hackathonDate).getTime());
   }, [allHackathons, today]);
 
   // Group upcoming events strictly by hackathonDate event month (not createdAt)
@@ -116,378 +193,154 @@ export default function DashboardContent({
       .map(([, value]) => value);
   }, [upcomingHackathons]);
 
+  const totalParticipants = useMemo(
+    () => allHackathons.reduce((sum, h) => sum + (h._count?.participants || 0), 0),
+    [allHackathons]
+  );
+
+  const firstName = userName?.trim().split(/\s+/)[0];
+
   return (
-    <div className="space-y-8 sm:space-y-10">
-      {/* ═══════ 2. Hero Section ═══════ */}
-      <section className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8 pt-4 sm:pt-6">
-        {/* Left: Date, Headline, Description, and CTAs */}
+    <div className="space-y-10 sm:space-y-12">
+      {/* ═══════ Hero ═══════ */}
+      <section className="flex flex-col items-start justify-between gap-8 lg:flex-row lg:items-center">
         <div className="max-w-xl">
-          <div className="flex items-center gap-2 mb-2">
-            <p className="text-xs sm:text-sm font-bold font-mono tracking-wider text-[#71717A] uppercase">
-              {currentDateLabel}
-            </p>
-            {/* Subtle doodle accent in whitespace */}
-            <span className="font-mono text-xs font-bold text-[#121212]/30 select-none">&lt;/&gt;</span>
-          </div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-[#121212] tracking-tight leading-[1.1]">
+          <p className="mb-2 font-mono text-xs sm:text-sm font-bold uppercase tracking-wider text-muted" suppressHydrationWarning>
+            {currentDateLabel}
+          </p>
+          <p className="mb-1 text-base sm:text-lg font-black text-ink" suppressHydrationWarning>
+            {greeting()}
+            {firstName ? `, ${firstName}` : ""} 👋
+          </p>
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black leading-[1.1] tracking-tight text-ink">
             Your next big thing starts here.
           </h1>
-          <p className="text-sm sm:text-base text-[#71717A] font-semibold mt-3 max-w-lg leading-relaxed">
+          <p className="mt-3 max-w-lg text-sm sm:text-base font-semibold leading-relaxed text-body">
             All your hackathons, deadlines, and participants in one place.
           </p>
 
-          <div className="flex flex-wrap items-center gap-3.5 mt-6">
-            <Link href="/hackathons/new">
-              <button className="brutal-btn bg-[#FFEB3B] hover:bg-[#FDD835] text-[#121212] border-2 border-[#121212] shadow-brutal px-5 py-2.5 rounded-lg font-black text-sm sm:text-base">
-                + New Hackathon
-              </button>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <Link href="/hackathons/new" className={buttonVariants({ size: "lg", className: "font-black" })}>
+              <CalendarPlus className="h-5 w-5" />
+              New Hackathon
             </Link>
-
-            <Link href="/ai-add">
-              <button className="brutal-btn bg-white hover:bg-[#F4F4F5] text-[#121212] border-2 border-[#121212] shadow-brutal px-5 py-2.5 rounded-lg font-bold text-sm sm:text-base flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-[#121212]" />
-                <span>Import with AI</span>
-              </button>
+            <Link href="/ai-add" className={buttonVariants({ variant: "outline", size: "lg" })}>
+              <Sparkles className="h-5 w-5" />
+              Import with AI
             </Link>
           </div>
         </div>
 
-        {/* Right: Exact Dual-Window Vector Illustration */}
-        <div className="self-center lg:self-auto shrink-0 w-full sm:w-auto flex justify-center mt-2 lg:mt-0">
-          <svg
-            className="w-64 sm:w-72 md:w-80 h-auto select-none"
-            viewBox="0 0 280 200"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            {/* Top-left burst lines */}
-            <line x1="72" y1="36" x2="62" y2="20" stroke="#121212" strokeWidth="2.5" strokeLinecap="round" />
-            <line x1="84" y1="32" x2="84" y2="14" stroke="#121212" strokeWidth="2.5" strokeLinecap="round" />
-            <line x1="96" y1="36" x2="106" y2="20" stroke="#121212" strokeWidth="2.5" strokeLinecap="round" />
-
-            {/* Back Window (Blue) */}
-            <g>
-              <rect x="94" y="38" width="160" height="110" rx="10" fill="#121212" />
-              <rect
-                x="90"
-                y="34"
-                width="160"
-                height="110"
-                rx="10"
-                fill="#2196F3"
-                stroke="#121212"
-                strokeWidth="3"
-              />
-              <circle cx="106" cy="46" r="2.5" fill="#121212" />
-              <circle cx="116" cy="46" r="2.5" fill="#121212" />
-              <circle cx="126" cy="46" r="2.5" fill="#121212" />
-            </g>
-
-            {/* Front Window (White) */}
-            <g>
-              {/* Drop Shadow */}
-              <rect x="44" y="68" width="166" height="116" rx="10" fill="#121212" />
-              {/* White Box */}
-              <rect
-                x="40"
-                y="64"
-                width="166"
-                height="116"
-                rx="10"
-                fill="#FFFFFF"
-                stroke="#121212"
-                strokeWidth="3"
-              />
-              {/* Top Bar Dots */}
-              <circle cx="56" cy="76" r="2.5" fill="#121212" />
-              <circle cx="66" cy="76" r="2.5" fill="#121212" />
-              <circle cx="76" cy="76" r="2.5" fill="#121212" />
-
-              {/* Title & Placeholder Lines */}
-              <text
-                x="54"
-                y="114"
-                fontSize="14"
-                fontWeight="900"
-                fontFamily="system-ui, -apple-system, sans-serif"
-                fill="#121212"
-                letterSpacing="0.05em"
-              >
-                HACKATHON
-              </text>
-              <rect x="54" y="130" width="70" height="5" rx="2.5" fill="#121212" />
-              <rect x="54" y="142" width="45" height="5" rx="2.5" fill="#121212" />
-
-              {/* Yellow [HT] Badge inside Front Window */}
-              <rect
-                x="146"
-                y="108"
-                width="44"
-                height="44"
-                rx="6"
-                fill="#FFEB3B"
-                stroke="#121212"
-                strokeWidth="2.5"
-              />
-              <text
-                x="168"
-                y="136"
-                textAnchor="middle"
-                fontSize="17"
-                fontWeight="900"
-                fontFamily="system-ui, -apple-system, sans-serif"
-                fill="#121212"
-              >
-                HT
-              </text>
-            </g>
+        {/* Illustration: decorative, hidden on phones to keep the fold for content */}
+        <div aria-hidden="true" className="hidden shrink-0 self-center sm:flex lg:self-auto">
+          <svg className="h-auto w-64 select-none md:w-80" viewBox="0 0 280 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="72" y1="36" x2="62" y2="20" stroke="var(--ht-ink)" strokeWidth="2.5" strokeLinecap="round" />
+            <line x1="84" y1="32" x2="84" y2="14" stroke="var(--ht-ink)" strokeWidth="2.5" strokeLinecap="round" />
+            <line x1="96" y1="36" x2="106" y2="20" stroke="var(--ht-ink)" strokeWidth="2.5" strokeLinecap="round" />
+            <rect x="94" y="38" width="160" height="110" rx="10" fill="var(--ht-shadow)" />
+            <rect x="90" y="34" width="160" height="110" rx="10" fill="#2196F3" stroke="var(--ht-ink)" strokeWidth="3" />
+            <circle cx="106" cy="46" r="2.5" fill="#121212" />
+            <circle cx="116" cy="46" r="2.5" fill="#121212" />
+            <circle cx="126" cy="46" r="2.5" fill="#121212" />
+            <rect x="44" y="68" width="166" height="116" rx="10" fill="var(--ht-shadow)" />
+            <rect x="40" y="64" width="166" height="116" rx="10" fill="var(--ht-surface)" stroke="var(--ht-ink)" strokeWidth="3" />
+            <circle cx="56" cy="76" r="2.5" fill="var(--ht-ink)" />
+            <circle cx="66" cy="76" r="2.5" fill="var(--ht-ink)" />
+            <circle cx="76" cy="76" r="2.5" fill="var(--ht-ink)" />
+            <text x="54" y="114" fontSize="14" fontWeight="900" fontFamily="system-ui, -apple-system, sans-serif" fill="var(--ht-ink)" letterSpacing="0.05em">
+              HACKATHON
+            </text>
+            <rect x="54" y="130" width="70" height="5" rx="2.5" fill="var(--ht-ink)" />
+            <rect x="54" y="142" width="45" height="5" rx="2.5" fill="var(--ht-ink)" />
+            <rect x="146" y="108" width="44" height="44" rx="6" fill="#FFEB3B" stroke="var(--ht-ink)" strokeWidth="2.5" />
+            <text x="168" y="136" textAnchor="middle" fontSize="17" fontWeight="900" fontFamily="system-ui, -apple-system, sans-serif" fill="#121212">
+              HT
+            </text>
           </svg>
         </div>
       </section>
 
-      {/* ═══════ Thin Divider directly between Hero & Upcoming ═══════ */}
-      <div className="w-full border-t border-[#121212]/20 my-6 sm:my-8" />
-
-      {/* ═══════ 4. Upcoming Hackathons ═══════ */}
-      <section className="space-y-5 sm:space-y-6">
-        {/* Section Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl sm:text-2xl font-black text-[#121212] tracking-tight">
-              Upcoming Hackathons
-            </h2>
-            {/* Subtle doodle accent */}
-            <span className="font-mono text-xs font-bold text-[#121212]/25 select-none tracking-widest">&#123; &#125;</span>
-          </div>
-          <Link
-            href="/hackathons"
-            className="text-xs sm:text-sm font-bold text-[#121212] hover:underline flex items-center gap-1 group"
-          >
-            <span>View all</span>
-            <span className="transition-transform group-hover:translate-x-1 font-bold">
-              →
-            </span>
-          </Link>
+      {/* ═══════ At a glance ═══════ */}
+      <section aria-labelledby="stats-heading" className="space-y-4">
+        <h2 id="stats-heading" className="sr-only">
+          At a glance
+        </h2>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          <StatTile icon={Trophy} label="Upcoming hackathons" value={upcomingHackathons.length} tone="bg-[#FFEB3B] text-on-accent" />
+          <StatTile icon={Users} label="Participants" value={totalParticipants} tone="bg-[#00E676] text-on-accent" />
+          <StatTile icon={Send} label="Scheduled emails" value={scheduledMessagesCount} tone="bg-[#2196F3] text-white" />
+          <StatTile icon={CheckCheck} label="Emails sent" value={sentMessagesCount} tone="bg-surface text-ink" />
         </div>
 
-        {/* Empty state or cards */}
-        {upcomingHackathons.length === 0 ? (
-          <div className="brutal-card p-8 sm:p-10 text-center rounded-2xl bg-white border-2 border-[#121212] shadow-brutal-sm">
-            <h3 className="font-black text-lg sm:text-xl text-[#121212] tracking-tight">
-              No upcoming hackathons
-            </h3>
-            <p className="text-xs sm:text-sm text-[#71717A] max-w-md mx-auto mt-2 mb-6 font-medium">
-              Create your first hackathon or use AI extraction to import events.
+        {!googleAccount?.connected && (
+          <div className="flex flex-col gap-3 rounded-xl border-2 border-ink bg-[#FFEB3B]/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="flex items-start gap-2.5 text-sm font-bold text-ink">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              Connect an email account so your scheduled broadcasts can be delivered.
             </p>
-            <Link href="/hackathons/new">
-              <button className="brutal-btn bg-[#FFEB3B] hover:bg-[#FDD835] text-[#121212] border-2 border-[#121212] shadow-brutal-sm px-4 py-2 rounded-lg font-black text-sm">
-                + New Hackathon
-              </button>
+            <Link href="/settings" className={buttonVariants({ variant: "dark", size: "sm", className: "shrink-0" })}>
+              Connect Gmail
             </Link>
-          </div>
-        ) : upcomingGrouped.length > 1 ? (
-          /* Multi-month grouped layout strictly by hackathonDate event month */
-          <div className="space-y-8">
-            {upcomingGrouped.map((group) => (
-              <div key={group.label} className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-black text-[#121212] uppercase tracking-wider bg-[#FFEB3B] px-2 py-0.5 border border-[#121212] rounded shadow-[1.5px_1.5px_0px_#121212]">
-                    {group.label}
-                  </span>
-                  <span className="text-xs font-mono font-bold text-[#71717A]">
-                    ({group.hackathons.length} event{group.hackathons.length !== 1 ? "s" : ""})
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {group.hackathons.map((hackathon, index) => {
-                    const isMint = index % 3 === 2;
-                    return (
-                      <Link
-                        key={hackathon.id}
-                        href={`/hackathons/${hackathon.id}`}
-                        className="group block"
-                      >
-                        <div className="brutal-card rounded-xl p-5 bg-white border-2 border-[#121212] shadow-brutal-sm flex flex-col justify-between hover:-translate-y-1 hover:shadow-brutal transition-all duration-150 h-full">
-                          <div>
-                            {/* Top Row: UPCOMING Badge + Short Date */}
-                            <div className="flex items-center justify-between gap-2 mb-3">
-                              <span
-                                className={`px-2.5 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider border-2 border-[#121212] shadow-[1.5px_1.5px_0px_#121212] ${
-                                  isMint
-                                    ? "bg-[#00E676] text-[#121212]"
-                                    : "bg-[#2196F3] text-white"
-                                }`}
-                              >
-                                UPCOMING
-                              </span>
-                              <span className="text-xs font-mono font-black text-[#121212] uppercase tracking-wider">
-                                {formatShortDate(hackathon.hackathonDate)}
-                              </span>
-                            </div>
-
-                            {/* Hackathon Name */}
-                            <h3 className="font-black text-lg text-[#121212] line-clamp-1 mb-1 tracking-tight group-hover:underline">
-                              {hackathon.name}
-                            </h3>
-
-                            {/* Location & Registration Subtitle */}
-                            <p className="text-xs text-[#71717A] font-medium line-clamp-1 mb-4">
-                              {getSubtitle(hackathon)}
-                            </p>
-                          </div>
-
-                          {/* Bottom Row: Participants + Right Arrow */}
-                          <div className="flex items-center justify-between pt-3 border-t border-[#121212]/15 text-xs font-bold text-[#121212]">
-                            <div className="flex items-center gap-1.5">
-                              <Users className="w-3.5 h-3.5 stroke-[2.2] text-[#121212]" />
-                              <span>
-                                {hackathon._count?.participants || 0} participants
-                              </span>
-                            </div>
-                            <span className="text-base font-black text-[#121212] group-hover:translate-x-1 transition-transform">
-                              →
-                            </span>
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          /* Single month layout: direct 3-column responsive grid */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {upcomingHackathons.map((hackathon, index) => {
-              const isMint = index % 3 === 2;
-              return (
-                <Link
-                  key={hackathon.id}
-                  href={`/hackathons/${hackathon.id}`}
-                  className="group block"
-                >
-                  <div className="brutal-card rounded-xl p-5 bg-white border-2 border-[#121212] shadow-brutal-sm flex flex-col justify-between hover:-translate-y-1 hover:shadow-brutal transition-all duration-150 h-full">
-                    <div>
-                      {/* Top Row: UPCOMING Badge + Short Date */}
-                      <div className="flex items-center justify-between gap-2 mb-3">
-                        <span
-                          className={`px-2.5 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider border-2 border-[#121212] shadow-[1.5px_1.5px_0px_#121212] ${
-                            isMint
-                              ? "bg-[#00E676] text-[#121212]"
-                              : "bg-[#2196F3] text-white"
-                          }`}
-                        >
-                          UPCOMING
-                        </span>
-                        <span className="text-xs font-mono font-black text-[#121212] uppercase tracking-wider">
-                          {formatShortDate(hackathon.hackathonDate)}
-                        </span>
-                      </div>
-
-                      {/* Hackathon Name */}
-                      <h3 className="font-black text-lg text-[#121212] line-clamp-1 mb-1 tracking-tight group-hover:underline">
-                        {hackathon.name}
-                      </h3>
-
-                      {/* Location & Registration Subtitle */}
-                      <p className="text-xs text-[#71717A] font-medium line-clamp-1 mb-4">
-                        {getSubtitle(hackathon)}
-                      </p>
-                    </div>
-
-                    {/* Bottom Row: Participants + Right Arrow */}
-                    <div className="flex items-center justify-between pt-3 border-t border-[#121212]/15 text-xs font-bold text-[#121212]">
-                      <div className="flex items-center gap-1.5">
-                        <Users className="w-3.5 h-3.5 stroke-[2.2] text-[#121212]" />
-                        <span>
-                          {hackathon._count?.participants || 0} participants
-                        </span>
-                      </div>
-                      <span className="text-base font-black text-[#121212] group-hover:translate-x-1 transition-transform">
-                        →
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
           </div>
         )}
       </section>
 
-      {/* ═══════ 5. Get started with HackTrack (Three-Step Guide) ═══════ */}
-      <section className="brutal-card rounded-2xl p-5 sm:p-6 bg-[#FEFDF8] border-2 border-[#121212] shadow-brutal-sm">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xl sm:text-2xl font-black text-[#121212] tracking-tight">
-            Get started with HackTrack
-          </h2>
-          {/* Subtle terminal prompt doodle */}
-          <span className="font-mono text-xs font-bold text-[#121212]/25 select-none">&gt;_</span>
-        </div>
-        <p className="text-xs sm:text-sm text-[#71717A] font-medium mt-1 mb-5 sm:mb-6">
-          A simple workflow to keep every event organized.
-        </p>
-
-        <div className="space-y-4 sm:space-y-5">
-          {/* Step 1: Create an event */}
-          <Link
-            href="/hackathons/new"
-            className="group flex items-start gap-3.5 p-1 rounded-xl hover:bg-black/[0.02] transition-colors"
-          >
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#FFEB3B] flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform">
-              <CalendarPlus className="w-5 h-5 text-[#121212] stroke-[2]" />
-            </div>
-            <div>
-              <h3 className="font-black text-sm sm:text-base text-[#121212] group-hover:underline">
-                1. Create an event
-              </h3>
-              <p className="text-xs sm:text-sm text-[#71717A] font-medium mt-0.5 leading-relaxed">
-                Enter hackathon dates, rounds, fees, and registration details.
-              </p>
-            </div>
-          </Link>
-
-          {/* Step 2: Add participants */}
-          <Link
-            href="/hackathons"
-            className="group flex items-start gap-3.5 p-1 rounded-xl hover:bg-black/[0.02] transition-colors"
-          >
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#DDEBFF] flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform">
-              <Users className="w-5 h-5 text-[#121212] stroke-[2]" />
-            </div>
-            <div>
-              <h3 className="font-black text-sm sm:text-base text-[#121212] group-hover:underline">
-                2. Add participants
-              </h3>
-              <p className="text-xs sm:text-sm text-[#71717A] font-medium mt-0.5 leading-relaxed">
-                Keep participant names and email addresses organized per event.
-              </p>
-            </div>
-          </Link>
-
-          {/* Step 3: Schedule updates */}
-          <Link
-            href={
-              upcomingHackathons.length > 0
-                ? `/hackathons/${upcomingHackathons[0].id}`
-                : "/hackathons"
-            }
-            className="group flex items-start gap-3.5 p-1 rounded-xl hover:bg-black/[0.02] transition-colors"
-          >
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#DCFCE7] flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform">
-              <Mail className="w-5 h-5 text-[#121212] stroke-[2]" />
-            </div>
-            <div>
-              <h3 className="font-black text-sm sm:text-base text-[#121212] group-hover:underline">
-                3. Schedule updates
-              </h3>
-              <p className="text-xs sm:text-sm text-[#71717A] font-medium mt-0.5 leading-relaxed">
-                Prepare messages and choose when they should be sent.
-              </p>
-            </div>
+      {/* ═══════ Upcoming Hackathons ═══════ */}
+      <section className="space-y-5 sm:space-y-6">
+        <div className="flex items-end justify-between gap-4 border-b-2 border-ink pb-3">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-ink" />
+            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-ink">Upcoming Hackathons</h2>
+          </div>
+          <Link href="/hackathons" className="group flex shrink-0 items-center gap-1 text-xs sm:text-sm font-bold text-ink hover:underline">
+            View all
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Link>
         </div>
+
+        {upcomingHackathons.length === 0 ? (
+          <div className="rounded-2xl border-2 border-dashed border-ink bg-surface p-8 text-center sm:p-10">
+            <h3 className="text-lg sm:text-xl font-black tracking-tight text-ink">No upcoming hackathons</h3>
+            <p className="mx-auto mt-2 mb-6 max-w-md text-xs sm:text-sm font-medium text-muted">
+              Create your first hackathon or use AI extraction to import events.
+            </p>
+            <Link href="/hackathons/new" className={buttonVariants({ size: "sm", className: "font-black" })}>
+              <CalendarPlus className="h-4 w-4" />
+              New Hackathon
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {upcomingGrouped.map((group) => (
+              <div key={group.label} className="space-y-4">
+                {upcomingGrouped.length > 1 && (
+                  <div className="flex items-center gap-2">
+                    <span className="rounded border border-ink bg-[#FFEB3B] px-2 py-0.5 font-mono text-xs font-black uppercase tracking-wider text-on-accent shadow-[1.5px_1.5px_0px_var(--ht-shadow)]">
+                      {group.label}
+                    </span>
+                    <span className="font-mono text-xs font-bold text-muted">
+                      ({group.hackathons.length} event{group.hackathons.length !== 1 ? "s" : ""})
+                    </span>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
+                  {group.hackathons.map((hackathon, index) => (
+                    <HackathonCard key={hackathon.id} hackathon={hackathon} accent={index % 3 === 2 ? "mint" : "blue"} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ═══════ Developer streaks ═══════ */}
+      <section aria-labelledby="streaks-heading" className="space-y-3">
+        <div>
+          <p className="font-mono text-xs font-bold uppercase tracking-wider text-muted">Consistency</p>
+          <h2 id="streaks-heading" className="text-xl sm:text-2xl font-black tracking-tight text-ink">Developer streaks</h2>
+        </div>
+        <StreakDeck size="compact" />
       </section>
     </div>
   );

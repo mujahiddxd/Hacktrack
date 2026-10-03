@@ -7,17 +7,44 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Admin {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
+// Stored in the legacy "Admin" table so existing accounts survive the move to multi-user.
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  passwordHash String?
+  googleId     String? @unique
   name         String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  image        String? @db.Text
+
+  // Profile collected by the first-login onboarding wizard; editable from /account.
+  // Defaults to false so accounts created before onboarding existed aren't sent through it.
+  needsOnboarding Boolean @default(false)
+  role            String?
+  degree          String?
+  fieldOfStudy    String?
+  institution     String?
+  graduationYear  Int?
+  city            String?
+  country         String?
+  experienceLevel String?
+  skills          String? @db.Text
+  interests       String? @db.Text
+  githubUrl       String?
+  linkedinUrl     String?
+
+  hackathons     Hackathon[]
+  gmailToken     GoogleAuthToken?
+  activityEvents ActivityEvent[]
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@map("Admin")
 }
 
 model GoogleAuthToken {
-  id           String   @id @default("primary")
+  id           String   @id @default(cuid())
+  userId       String?  @unique
+  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   email        String
   accessToken  String   @db.Text
   refreshToken String   @db.Text
@@ -30,6 +57,9 @@ model GoogleAuthToken {
 
 model Hackathon {
   id                   String             @id @default(cuid())
+  // Nullable only so existing rows can be migrated; run `npm run db:backfill-owner` after `db push`.
+  userId               String?
+  user                 User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
   name                 String
   description          String             @db.Text
   roundDetails         String?            @db.Text
@@ -46,34 +76,35 @@ model Hackathon {
   updatedAt            DateTime           @updatedAt
 
   @@index([status])
+  @@index([userId])
 }
 
 model Participant {
-  id           String             @id @default(cuid())
-  hackathonId  String
-  hackathon    Hackathon          @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
-  name         String
-  email        String
-  recipients   MessageRecipient[]
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  id          String             @id @default(cuid())
+  hackathonId String
+  hackathon   Hackathon          @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
+  name        String
+  email       String
+  recipients  MessageRecipient[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   @@unique([hackathonId, email])
   @@index([hackathonId])
 }
 
 model ScheduledMessage {
-  id           String             @id @default(cuid())
-  hackathonId  String
-  hackathon    Hackathon          @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
-  subject      String
-  message      String             @db.Text
-  scheduledAt  DateTime
-  status       String             @default("SCHEDULED")
-  sentAt       DateTime?
-  recipients   MessageRecipient[]
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  id          String             @id @default(cuid())
+  hackathonId String
+  hackathon   Hackathon          @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
+  subject     String
+  message     String             @db.Text
+  scheduledAt DateTime
+  status      String             @default("SCHEDULED")
+  sentAt      DateTime?
+  recipients  MessageRecipient[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   @@index([hackathonId])
   @@index([status, scheduledAt])
@@ -93,4 +124,21 @@ model MessageRecipient {
 
   @@index([scheduledMessageId])
   @@index([participantId])
+}
+
+/// One row per qualifying HackTrack action, written only after the action succeeded.
+/// Drives the HackTrack streak. Tied to the user (not the hackathon/participant), so deleting
+/// a participant later doesn't erase the day it was added.
+model ActivityEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// HACKATHON_CREATED | PARTICIPANT_ADDED | EMAIL_DELIVERED
+  kind       String
+  /// "<kind>:<source record id>" so retries and backfills can never double-count
+  dedupeKey  String   @unique
+  occurredAt DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([userId, occurredAt])
 }

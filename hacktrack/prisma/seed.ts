@@ -9,7 +9,7 @@ async function main() {
 
   const passwordHash = await bcrypt.hash(adminPassword, 10);
 
-  const admin = await prisma.admin.upsert({
+  const admin = await prisma.user.upsert({
     where: { email: adminEmail },
     update: { passwordHash },
     create: {
@@ -21,11 +21,12 @@ async function main() {
 
   console.log(`Admin account created / updated: ${admin.email}`);
 
-  // Create sample hackathons if none exist
-  const count = await prisma.hackathon.count();
+  // Create sample hackathons for the seeded account if it has none
+  const count = await prisma.hackathon.count({ where: { userId: admin.id } });
   if (count === 0) {
     const hackathon1 = await prisma.hackathon.create({
       data: {
+        userId: admin.id,
         name: "CodeStorm 2026",
         description: "The ultimate 48-hour global hackathon building the future of autonomous systems and Web3.",
         roundDetails: "Round 1: Idea Submission & Prototype\nRound 2: Live Demo & Code Review\nRound 3: Grand Finale Pitch",
@@ -47,6 +48,7 @@ async function main() {
 
     const hackathon2 = await prisma.hackathon.create({
       data: {
+        userId: admin.id,
         name: "AI Genesis 2026",
         description: "A premier generative AI hackathon tackling multimodal reasoning, agents, and robotics.",
         roundDetails: "Preliminary Screening -> Model Evaluation -> Final Showcase",

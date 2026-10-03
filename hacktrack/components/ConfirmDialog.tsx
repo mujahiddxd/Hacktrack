@@ -46,14 +46,14 @@ export function ConfirmDialog({
           if (!isLoading) onClose();
         }}
       />
-      <div className="relative w-full max-w-md brutal-card rounded-2xl bg-white p-6 shadow-brutal z-10 space-y-5 animate-in zoom-in-95 duration-150">
+      <div className="relative w-full max-w-md brutal-card rounded-2xl bg-surface p-6 shadow-brutal z-10 space-y-5 animate-in zoom-in-95 duration-150">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-[#FFEB3B] rounded-xl border-2 border-[#121212] shrink-0">
-              <AlertTriangle className="w-5 h-5 text-[#121212]" />
+            <div className="p-2.5 bg-[#FFEB3B] text-on-accent rounded-xl border-2 border-ink shrink-0">
+              <AlertTriangle className="w-5 h-5 text-ink" />
             </div>
             <div>
-              <h3 className="font-black text-lg text-[#121212] leading-tight">
+              <h3 className="font-black text-lg text-ink leading-tight">
                 {title}
               </h3>
             </div>
@@ -61,18 +61,18 @@ export function ConfirmDialog({
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="p-1 hover:bg-[#F4F4F5] rounded-md transition-colors text-[#71717A] hover:text-[#121212] border-2 border-transparent hover:border-[#121212]"
+            className="p-1 hover:bg-quiet rounded-md transition-colors text-muted hover:text-ink border-2 border-transparent hover:border-ink"
             aria-label="Close dialog"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <p className="text-sm font-medium text-[#71717A] leading-relaxed">
+        <p className="text-sm font-medium text-muted leading-relaxed">
           {description}
         </p>
 
-        <div className="flex items-center justify-end gap-3 pt-3 border-t-2 border-[#121212]">
+        <div className="flex items-center justify-end gap-3 pt-3 border-t-2 border-ink">
           <Button
             type="button"
             variant="outline"

@@ -1,0 +1,530 @@
+"use client";
+
+import * as React from "react";
+import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  extractAndCheckHackathonAction,
+  getAiEngineStatusAction,
+  createHackathon,
+  checkHackathonDateConflict,
+  type DateConflictCheckResult,
+} from "@/actions/hackathons";
+import type { AiExtractedHackathon } from "@/lib/ai-schema";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { FormActions, FormSection, PageHeader, PageShell } from "@/components/ui/page-header";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { DateConflictAlert } from "@/components/DateConflictAlert";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import {
+  Sparkles,
+  Send,
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  RefreshCw,
+  Cpu,
+  Info,
+} from "lucide-react";
+import { toast } from "sonner";
+
+export default function AiAddPage() {
+  const router = useRouter();
+
+  // AI engine status state
+  const [engineStatus, setEngineStatus] = useState<{ hasKey: boolean; provider: string } | null>(null);
+
+  // Extraction step state
+  const [rawText, setRawText] = useState("");
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const [extractedData, setExtractedData] = useState<AiExtractedHackathon | null>(null);
+
+  // Controlled form input states
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [roundDetails, setRoundDetails] = useState("");
+  const [hackathonDate, setHackathonDate] = useState("");
+  const [registrationDeadline, setRegistrationDeadline] = useState("");
+  const [fee, setFee] = useState("Free");
+  const [location, setLocation] = useState("Online / Discord");
+  const [registrationLink, setRegistrationLink] = useState("");
+
+  // Broadcast states
+  const [enableBroadcast, setEnableBroadcast] = useState(true);
+  const [broadcastSubject, setBroadcastSubject] = useState("");
+  const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [broadcastScheduledAt, setBroadcastScheduledAt] = useState("");
+
+  // Conflict & submission states
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingConflict, setIsCheckingConflict] = useState(false);
+  const [conflictData, setConflictData] = useState<DateConflictCheckResult | null>(null);
+  const [showConflictConfirm, setShowConflictConfirm] = useState(false);
+  const [pendingFormData, setPendingFormData] = useState<FormData | null>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    getAiEngineStatusAction().then(setEngineStatus).catch(() => {});
+  }, []);
+
+  const handleExtract = async () => {
+    if (!rawText.trim()) {
+      toast.error("Please paste hackathon details or announcement text first.");
+      return;
+    }
+
+    setIsExtracting(true);
+    setExtractError(null);
+
+    try {
+      const res = await extractAndCheckHackathonAction(rawText);
+      if (res?.error) {
+        setExtractError(res.error);
+        toast.error(res.error);
+        return;
+      }
+
+      if (res?.data) {
+        const d = res.data;
+        setExtractedData(d);
+
+        // Update all controlled fields
+        setName(d.name || "");
+        setDescription(d.description || "");
+        setRoundDetails(d.roundDetails || "");
+        setFee(d.fee || "Free");
+        setLocation(d.location || "Online / Discord");
+        setRegistrationLink(d.registrationLink || "");
+
+        const extractedDate = d.hackathonDate || "";
+        setHackathonDate(extractedDate);
+
+        const extractedDeadline = d.registrationDeadline || "";
+        setRegistrationDeadline(extractedDeadline);
+
+        // Calculate smart broadcast defaults
+        const eventName = d.name || "the Hackathon";
+        setBroadcastSubject(`Important Guidelines & Access Schedule for ${eventName}`);
+        setBroadcastMessage(
+          `Hello {name},\n\nWelcome to ${eventName}! Please review our schedule, challenge tracks, and submission guidelines.\n\nHappy hacking!\nOrganizing Committee`
+        );
+
+        if (extractedDate) {
+          const eventTime = new Date(extractedDate).getTime();
+          if (!isNaN(eventTime)) {
+            // Default broadcast to 1 day before the hackathon at 9:00 AM
+            const oneDayBefore = new Date(eventTime - 24 * 60 * 60 * 1000);
+            oneDayBefore.setHours(9, 0, 0, 0);
+            setBroadcastScheduledAt(oneDayBefore.toISOString().slice(0, 16));
+          } else {
+            const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+            tomorrow.setHours(9, 0, 0, 0);
+            setBroadcastScheduledAt(tomorrow.toISOString().slice(0, 16));
+          }
+        } else {
+          const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+          tomorrow.setHours(9, 0, 0, 0);
+          setBroadcastScheduledAt(tomorrow.toISOString().slice(0, 16));
+        }
+
+        // Handle date conflicts
+        if (res.dateConflict) {
+          setConflictData(res.dateConflict);
+          if (res.dateConflict.hasConflict) {
+            toast.warning(
+              `Date Conflict Detected: A hackathon is already registered on ${res.dateConflict.dateFormatted || "this date"}!`,
+              { duration: 6000, id: "ai-date-conflict" }
+            );
+          } else {
+            toast.success("Hackathon extracted! Event date is available with no conflicts.");
+          }
+        } else {
+          setConflictData(null);
+          toast.success("Hackathon extracted successfully!");
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Extraction failed";
+      setExtractError(msg);
+      toast.error(msg);
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  const handleDateChange = (val: string) => {
+    setHackathonDate(val);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    if (!val || val.trim().length < 10) {
+      setConflictData(null);
+      setIsCheckingConflict(false);
+      return;
+    }
+
+    setIsCheckingConflict(true);
+    debounceTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await checkHackathonDateConflict(val);
+        setConflictData(res);
+        if (res.hasConflict) {
+          toast.warning(
+            `Date Conflict: A hackathon is already registered on ${res.dateFormatted || "this date"}!`,
+            { id: "date-conflict-warning" }
+          );
+        }
+      } catch (err) {
+        console.error("Conflict check failed:", err);
+      } finally {
+        setIsCheckingConflict(false);
+      }
+    }, 350);
+  };
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+
+    if (conflictData?.hasConflict) {
+      setPendingFormData(formData);
+      setShowConflictConfirm(true);
+      return;
+    }
+
+    await executeSubmit(formData);
+  }
+
+  async function executeSubmit(formData: FormData, allowDuplicate = false) {
+    setIsSubmitting(true);
+
+    if (allowDuplicate) {
+      formData.set("allowDuplicateDate", "true");
+    }
+
+    const res = await createHackathon(formData);
+
+    if (res?.error) {
+      toast.error(res.error);
+      setIsSubmitting(false);
+      return;
+    }
+
+    toast.success("Hackathon created successfully from AI extraction!");
+    if (res?.hackathonId) {
+      router.push(`/hackathons/${res.hackathonId}`);
+    } else {
+      router.push("/hackathons");
+    }
+  }
+
+  const handleConfirmDuplicate = () => {
+    setShowConflictConfirm(false);
+    if (pendingFormData) {
+      executeSubmit(pendingFormData, true);
+    }
+  };
+
+  return (
+    <PageShell width="narrow">
+      <PageHeader
+        backHref="/hackathons"
+        backLabel="All hackathons"
+        icon={Sparkles}
+        title="AI hackathon import"
+        description="Paste an announcement, email or brochure text. We'll extract the details and check them against your schedule."
+        actions={
+          engineStatus &&
+          (engineStatus.hasKey ? (
+            <span className="inline-flex items-center gap-1.5 rounded-lg border-2 border-ink bg-[#00E676]/20 px-3 py-1 font-mono text-xs font-bold text-ink">
+              <Cpu className="h-3.5 w-3.5" />
+              {engineStatus.provider} AI active
+            </span>
+          ) : (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-lg border-2 border-ink bg-[#FFEB3B]/30 px-3 py-1 font-mono text-xs font-bold text-ink"
+              title="Add GEMINI_API_KEY to .env for LLM extraction"
+            >
+              <Info className="h-3.5 w-3.5" />
+              Basic parser mode
+            </span>
+          ))
+        }
+      />
+
+      <section className="brutal-card rounded-2xl bg-surface p-5 sm:p-6 md:p-8">
+        <FormSection step={1} title="Paste the announcement">
+          <Textarea
+            label="Announcement / PDF text"
+            rows={6}
+            placeholder="Paste raw hackathon text here... (e.g. 'CodeStorm 2026 takes place on October 15, 2026. Registration deadline is October 10. Venue: Discord/Online. Free entry. Round 1: Idea Pitch...')"
+            value={rawText}
+            onChange={(e) => setRawText(e.target.value)}
+            disabled={isExtracting}
+            helperText="Extracts event dates, rounds, location, fees, and checks against your existing registered hackathon schedule."
+          />
+
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-xs font-mono text-muted">
+              {rawText.length > 0 ? `${rawText.length.toLocaleString()} characters` : "Empty input"}
+            </span>
+
+            <Button
+              type="button"
+              variant="primary"
+              size="md"
+              onClick={handleExtract}
+              disabled={isExtracting || !rawText.trim()}
+              className="w-full gap-2 font-black sm:w-auto"
+            >
+              {isExtracting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Analyzing…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  Extract & Check Schedule
+                </>
+              )}
+            </Button>
+          </div>
+        </FormSection>
+
+        {extractError && (
+          <div className="mt-4 p-4 bg-[#FF5252]/15 border-2 border-[#FF5252] rounded-lg text-xs font-bold text-[#FF5252]">
+            {extractError}
+          </div>
+        )}
+      </section>
+
+      {/* Step 2: Extracted Preview & Form */}
+      {extractedData && (
+        <section className="brutal-card rounded-2xl p-5 sm:p-6 md:p-8 bg-surface space-y-6 animate-in fade-in zoom-in-95 duration-200">
+          <div className="flex flex-col gap-3 pb-4 border-b-3 border-ink sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 shrink-0 text-[#00E676]" />
+              <h2 className="text-lg sm:text-xl font-black text-ink tracking-tight">
+                Review &amp; save
+              </h2>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleExtract}
+              disabled={isExtracting}
+              className="gap-1.5 text-xs font-bold"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Re-analyze
+            </Button>
+          </div>
+
+          {/* AI Warnings / Conflict Banner */}
+          {extractedData.warnings && extractedData.warnings.length > 0 && (
+            <div className="p-3 bg-[#FFEB3B]/30 border-2 border-ink rounded-xl space-y-1">
+              <div className="flex items-center gap-2 text-xs font-black text-ink">
+                <AlertTriangle className="w-4 h-4 text-[#FF5252]" />
+                Extractor Notes:
+              </div>
+              <ul className="list-disc list-inside text-xs font-medium text-body space-y-0.5">
+                {extractedData.warnings.map((w, idx) => (
+                  <li key={idx}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Section 1: Core Details */}
+            <FormSection step={2} title="Hackathon information (editable)">
+
+              <Input
+                label="Hackathon Name"
+                name="name"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. CodeStorm 2026"
+              />
+
+              <Textarea
+                label="Description"
+                name="description"
+                required
+                rows={3}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Overview of hackathon themes and goals..."
+              />
+
+              <Textarea
+                label="Round Details & Milestones (Optional)"
+                name="roundDetails"
+                rows={3}
+                value={roundDetails}
+                onChange={(e) => setRoundDetails(e.target.value)}
+                placeholder="Stage 1, Stage 2, Grand Finale..."
+              />
+
+              {/* Date Input with Live Schedule Conflict Detection */}
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <Input
+                      label="Hackathon Event Date"
+                      name="hackathonDate"
+                      type="datetime-local"
+                      required
+                      value={hackathonDate}
+                      onChange={(e) => handleDateChange(e.target.value)}
+                      helperText="Commencement date and time"
+                    />
+                  </div>
+
+                  <Input
+                    label="Registration Deadline"
+                    name="registrationDeadline"
+                    type="datetime-local"
+                    required
+                    value={registrationDeadline}
+                    onChange={(e) => setRegistrationDeadline(e.target.value)}
+                    helperText="Cutoff for participant signups"
+                  />
+                </div>
+
+                {/* Real-time schedule conflict banner */}
+                <DateConflictAlert
+                  isChecking={isCheckingConflict}
+                  hasConflict={conflictData?.hasConflict ?? false}
+                  conflicts={conflictData?.conflicts ?? []}
+                  dateFormatted={conflictData?.dateFormatted}
+                  checkedDate={hackathonDate}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <Input
+                  label="Registration Fee"
+                  name="fee"
+                  value={fee}
+                  onChange={(e) => setFee(e.target.value)}
+                  placeholder="e.g. Free or ₹500"
+                />
+
+                <Input
+                  label="Location / Venue"
+                  name="location"
+                  required
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="e.g. Online or Bangalore Hub"
+                />
+              </div>
+
+              <Input
+                label="External Registration URL (Optional)"
+                name="registrationLink"
+                type="url"
+                value={registrationLink}
+                onChange={(e) => setRegistrationLink(e.target.value)}
+                placeholder="https://..."
+              />
+            </FormSection>
+
+            {/* Section 2: Automated Email Broadcast */}
+            <div className="p-4 sm:p-5 bg-[#FFEB3B]/15 border-3 border-ink rounded-xl space-y-4 shadow-brutal-sm">
+              <div className="flex flex-col gap-3 pb-3 border-b-2 border-ink sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 border-ink bg-[#FFEB3B] text-on-accent font-mono text-[11px] font-bold">
+                    3
+                  </span>
+                  <Send className="w-4 h-4 shrink-0 text-ink" />
+                  <h3 className="font-mono text-xs sm:text-sm font-bold uppercase tracking-wider text-ink">
+                    Welcome email broadcast
+                  </h3>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-bold">
+                  <input
+                    type="checkbox"
+                    checked={enableBroadcast}
+                    onChange={(e) => setEnableBroadcast(e.target.checked)}
+                    className="w-4 h-4 accent-ink cursor-pointer"
+                  />
+                  Schedule Broadcast
+                </label>
+              </div>
+
+              {enableBroadcast && (
+                <div className="space-y-4 pt-2">
+                  <Input
+                    label="Broadcast Subject"
+                    name="broadcastSubject"
+                    required={enableBroadcast}
+                    value={broadcastSubject}
+                    onChange={(e) => setBroadcastSubject(e.target.value)}
+                  />
+
+                  <Textarea
+                    label="Broadcast Message"
+                    name="broadcastMessage"
+                    required={enableBroadcast}
+                    rows={3}
+                    value={broadcastMessage}
+                    onChange={(e) => setBroadcastMessage(e.target.value)}
+                  />
+
+                  <Input
+                    label="Broadcast Send Date & Time"
+                    name="broadcastScheduledAt"
+                    type="datetime-local"
+                    required={enableBroadcast}
+                    value={broadcastScheduledAt}
+                    onChange={(e) => setBroadcastScheduledAt(e.target.value)}
+                    helperText="Calculated to reach participants prior to event kickoff"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Submit Actions */}
+            <FormActions>
+              <Link href="/hackathons" className={buttonVariants({ variant: "outline" })}>
+                Cancel
+              </Link>
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                disabled={isSubmitting}
+                className="gap-2 font-black"
+              >
+                <Sparkles className="w-4 h-4" />
+                {isSubmitting ? "Launching Hackathon..." : "Save & Launch Hackathon"}
+              </Button>
+            </FormActions>
+          </form>
+        </section>
+      )}
+
+      {/* Date Conflict Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showConflictConfirm}
+        onClose={() => setShowConflictConfirm(false)}
+        onConfirm={handleConfirmDuplicate}
+        title="Hackathon Date Already Registered"
+        description={`You already have active hackathon programming registered on ${conflictData?.dateFormatted || "this date"} (${conflictData?.conflicts.map((c) => `"${c.name}"`).join(", ")}). Are you sure you want to schedule another hackathon on the same date?`}
+        confirmLabel="Proceed Anyway"
+        confirmVariant="primary"
+        isLoading={isSubmitting}
+      />
+    </PageShell>
+  );
+}

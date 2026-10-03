@@ -6,45 +6,39 @@ import {
   getGoogleAuthUrl,
   connectDemoAccount,
 } from "@/lib/gmail";
-import { getSession } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
+import { createOAuthState, safeReturnPath } from "@/lib/google-oauth";
 import { revalidatePath } from "next/cache";
 
-async function requireAdmin() {
-  const session = await getSession();
-  if (!session) {
-    throw new Error("Unauthorized. Please log in as Admin.");
-  }
-  return session;
-}
-
 export async function getGoogleStatusAction() {
-  await requireAdmin();
-  return getConnectedGmailAccount();
+  const { userId } = await requireUser();
+  return getConnectedGmailAccount(userId);
 }
 
 export async function getGoogleAuthUrlAction(returnTo?: string) {
-  await requireAdmin();
-  return getGoogleAuthUrl(returnTo);
+  await requireUser();
+  const state = await createOAuthState("gmail", safeReturnPath(returnTo, "/settings"));
+  return getGoogleAuthUrl(state);
 }
 
 export async function connectDemoAccountAction(email?: string) {
-  await requireAdmin();
-  await connectDemoAccount(email || "organizer.hacktrack@gmail.com");
+  const { userId } = await requireUser();
+  await connectDemoAccount(userId, email || "organizer.hacktrack@gmail.com");
   revalidatePath("/settings");
   revalidatePath("/dashboard");
   return { success: true };
 }
 
 export async function disconnectGoogleAction() {
-  await requireAdmin();
-  await disconnectGmailAccount();
+  const { userId } = await requireUser();
+  await disconnectGmailAccount(userId);
   revalidatePath("/settings");
   revalidatePath("/dashboard");
   return { success: true };
 }
 
 export async function sendDirectTestEmailAction(to: string, subject?: string, body?: string) {
-  await requireAdmin();
+  const { userId } = await requireUser();
   if (!to || !to.includes("@")) {
     return { error: "Please enter a valid recipient email address." };
   }
@@ -52,6 +46,7 @@ export async function sendDirectTestEmailAction(to: string, subject?: string, bo
   try {
     const { sendEmail } = await import("@/lib/gmail");
     const result = await sendEmail({
+      userId,
       to: to.trim(),
       subject: subject?.trim() || "HackTrack Live Test Email",
       body: body?.trim() || "Hello,\n\nThis is a live test email sent from HackTrack to confirm that email dispatch is functioning properly.\n\nBest regards,\nHackTrack Team",
@@ -72,4 +67,3 @@ export async function sendDirectTestEmailAction(to: string, subject?: string, bo
     return { error: msg };
   }
 }
-

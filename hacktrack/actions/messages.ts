@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { processDueScheduledMessages } from "@/lib/scheduler";
 
@@ -14,16 +14,9 @@ const MessageSchema = z.object({
   recipientMode: z.enum(["all", "selected"]).default("all"),
 });
 
-async function requireAdmin() {
-  const session = await getSession();
-  if (!session) {
-    throw new Error("Unauthorized. Please log in as Admin.");
-  }
-  return session;
-}
 
 export async function scheduleMessageAction(formData: FormData) {
-  await requireAdmin();
+  const { userId } = await requireUser();
 
   const hackathonId = formData.get("hackathonId") as string;
   const subject = formData.get("subject") as string;
@@ -50,18 +43,24 @@ export async function scheduleMessageAction(formData: FormData) {
   }
 
   try {
-    // Determine participants
-    let participantIds: string[] = [];
-
-    if (recipientMode === "all" || selectedParticipantIds.length === 0) {
-      const allParticipants = await prisma.participant.findMany({
-        where: { hackathonId },
-        select: { id: true },
-      });
-      participantIds = allParticipants.map((p) => p.id);
-    } else {
-      participantIds = selectedParticipantIds;
+    const hackathon = await prisma.hackathon.findFirst({
+      where: { id: hackathonId, userId },
+      select: { id: true },
+    });
+    if (!hackathon) {
+      return { error: "Hackathon not found." };
     }
+
+    // Determine participants, only ever from this hackathon
+    const useAll = recipientMode === "all" || selectedParticipantIds.length === 0;
+    const participants = await prisma.participant.findMany({
+      where: {
+        hackathonId,
+        ...(useAll ? {} : { id: { in: selectedParticipantIds } }),
+      },
+      select: { id: true },
+    });
+    const participantIds = participants.map((p) => p.id);
 
     if (participantIds.length === 0) {
       return { error: "Cannot schedule message without recipients. Add participants first." };
@@ -103,10 +102,10 @@ export async function scheduleMessageAction(formData: FormData) {
 }
 
 export async function cancelScheduledMessage(messageId: string, hackathonId: string) {
-  await requireAdmin();
+  const { userId } = await requireUser();
   try {
-    const existing = await prisma.scheduledMessage.findUnique({
-      where: { id: messageId },
+    const existing = await prisma.scheduledMessage.findFirst({
+      where: { id: messageId, hackathon: { userId } },
     });
 
     if (!existing) {
@@ -130,7 +129,7 @@ export async function cancelScheduledMessage(messageId: string, hackathonId: str
 }
 
 export async function triggerManualWorkerDispatch() {
-  await requireAdmin();
+  await requireUser();
   try {
     const result = await processDueScheduledMessages();
     return { success: true, ...result };

@@ -24,8 +24,8 @@ export function DateConflictAlert({
   // If actively checking date availability
   if (isChecking) {
     return (
-      <div className="flex items-center gap-2 p-2.5 bg-[#F4F4F5] border-2 border-[#121212] rounded-lg text-xs font-mono font-bold text-[#71717A] animate-pulse">
-        <Loader2 className="w-3.5 h-3.5 animate-spin text-[#121212]" />
+      <div className="flex items-center gap-2 p-2.5 bg-quiet border-2 border-ink rounded-lg text-xs font-mono font-bold text-muted animate-pulse">
+        <Loader2 className="w-3.5 h-3.5 animate-spin text-ink" />
         Checking schedule availability for {dateFormatted || "selected date"}...
       </div>
     );
@@ -36,19 +36,19 @@ export function DateConflictAlert({
     return (
       <div className="p-4 bg-[#FF5252]/10 border-3 border-[#FF5252] rounded-xl space-y-3 shadow-brutal-sm animate-in fade-in zoom-in-95 duration-150">
         <div className="flex items-start gap-2.5">
-          <div className="p-1.5 bg-[#FF5252] text-white border-2 border-[#121212] rounded-md shrink-0 shadow-xs">
+          <div className="p-1.5 bg-[#FF5252] text-white border-2 border-ink rounded-md shrink-0 shadow-xs">
             <AlertTriangle className="w-4 h-4 stroke-[2.5]" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-mono text-[11px] font-black uppercase tracking-wider px-2 py-0.5 bg-[#FF5252] text-white rounded border border-[#121212]">
+              <span className="font-mono text-[11px] font-black uppercase tracking-wider px-2 py-0.5 bg-[#FF5252] text-white rounded border border-ink">
                 Date Conflict Alert
               </span>
-              <span className="text-xs font-black text-[#121212]">
+              <span className="text-xs font-black text-ink">
                 {conflicts.length} {conflicts.length === 1 ? "hackathon" : "hackathons"} already registered on {dateFormatted || "this date"}!
               </span>
             </div>
-            <p className="text-xs text-[#52525B] mt-1 font-medium leading-relaxed">
+            <p className="text-xs text-body mt-1 font-medium leading-relaxed">
               You already have active hackathon programming scheduled for this day. Review the conflicting events below:
             </p>
           </div>
@@ -68,20 +68,20 @@ export function DateConflictAlert({
             return (
               <div
                 key={conflict.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-white border-2 border-[#121212] rounded-lg shadow-xs hover:border-[#FF5252] transition-colors"
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-surface border-2 border-ink rounded-lg shadow-xs hover:border-[#FF5252] transition-colors"
               >
                 <div className="space-y-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-black text-sm text-[#121212] truncate">
+                    <span className="font-black text-sm text-ink truncate">
                       {conflict.name}
                     </span>
                     <Badge variant="blue" className="text-[10px] font-mono">
                       {conflict.fee || "Free"}
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-3 text-[11px] font-mono text-[#71717A] flex-wrap">
+                  <div className="flex items-center gap-3 text-[11px] font-mono text-muted flex-wrap">
                     {timeStr && (
-                      <span className="flex items-center gap-1 font-bold text-[#121212]">
+                      <span className="flex items-center gap-1 font-bold text-ink">
                         <Clock className="w-3 h-3 text-[#2196F3]" />
                         {timeStr}
                       </span>
@@ -108,7 +108,7 @@ export function DateConflictAlert({
           })}
         </div>
 
-        <div className="flex items-center justify-between text-[11px] font-mono text-[#71717A] pt-1 border-t border-[#FF5252]/30">
+        <div className="flex items-center justify-between text-[11px] font-mono text-muted pt-1 border-t border-[#FF5252]/30">
           <span>💡 Choose an alternate date above to avoid overlapping events.</span>
         </div>
       </div>
@@ -118,7 +118,7 @@ export function DateConflictAlert({
   // If checked and clean (no conflicts)
   if (!hasConflict && checkedDate && checkedDate.trim().length >= 10) {
     return (
-      <div className="flex items-center gap-2 p-2 bg-[#00E676]/15 border-2 border-[#00E676] rounded-lg text-xs font-mono font-bold text-[#121212] animate-in fade-in duration-150">
+      <div className="flex items-center gap-2 p-2 bg-[#00E676]/15 border-2 border-[#00E676] rounded-lg text-xs font-mono font-bold text-ink animate-in fade-in duration-150">
         <CheckCircle2 className="w-4 h-4 text-[#00E676] shrink-0 stroke-[2.5]" />
         <span>Date is clear! No hackathons currently registered on {dateFormatted || "this date"}.</span>
       </div>

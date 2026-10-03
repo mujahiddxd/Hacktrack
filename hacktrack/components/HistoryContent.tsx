@@ -4,7 +4,8 @@ import * as React from "react";
 import { useState, useMemo, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { PageHeader, PageShell } from "@/components/ui/page-header";
 import { Badge, HackathonStatusBadge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -33,6 +34,7 @@ import {
   ChevronRight,
   ChevronDown,
   Layers,
+  Plus,
 } from "lucide-react";
 
 type Hackathon = {
@@ -280,54 +282,38 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
   };
 
   return (
-    <div className="space-y-6">
-      {/* ── Page Header ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 brutal-card rounded-2xl bg-[#FFEB3B]">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="inline-block px-2.5 py-0.5 bg-[#121212] text-white text-xs font-mono font-bold uppercase rounded">
-              Audit & History
-            </span>
-            <Badge variant="neutral" className="text-xs">
-              {hackathons.length} Total
-            </Badge>
-          </div>
-          <h1 className="text-2xl md:text-3xl font-black text-[#121212] tracking-tight flex items-center gap-3">
-            <History className="w-7 h-7" />
-            <span>Hackathon History</span>
-            <span className="font-mono text-xs font-bold text-[#121212]/30 select-none tracking-widest pl-1">&lt;/&gt;</span>
-          </h1>
-          <p className="text-sm font-bold text-[#121212]/80 mt-1">
-            Complete chronological archive of all hackathons entered into HackTrack.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Link href="/hackathons/new">
-            <Button variant="dark" size="md">
-              Create Hackathon
-            </Button>
+    <PageShell>
+      <PageHeader
+        icon={History}
+        eyebrow={`${hackathons.length} total · audit log`}
+        title="History"
+        description="Every hackathon you've added — including flagged and removed ones you can restore."
+        actions={
+          <Link href="/hackathons/new" className={buttonVariants({ variant: "dark" })}>
+            <Plus className="h-4 w-4" />
+            Create Hackathon
           </Link>
-        </div>
-      </div>
+        }
+      />
 
       {/* ── Filters & Search Toolbar ── */}
-      <Card className="bg-white p-4 space-y-4">
+      <Card className="bg-surface p-4 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
           {/* Search bar */}
-          <div className="md:col-span-5 relative">
-            <Search className="w-4 h-4 text-[#71717A] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <div className="md:col-span-12 lg:col-span-5 relative">
+            <Search className="w-4 h-4 text-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by name, description, location..."
-              className="w-full pl-10 pr-4 py-2 text-sm font-medium rounded-lg border-2 border-[#121212] bg-[#FEFDF8] text-[#121212] placeholder:text-[#71717A] focus:outline-hidden focus:ring-2 focus:ring-[#FFEB3B]"
+              className="w-full pl-10 pr-4 py-2 text-sm font-medium rounded-lg border-2 border-ink bg-canvas text-ink placeholder:text-muted focus:outline-hidden focus:ring-2 focus:ring-[#FFEB3B]"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-[#121212]"
+                aria-label="Clear search"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -335,16 +321,16 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
           </div>
 
           {/* Month Created Filter */}
-          <div className="md:col-span-3 relative">
+          <div className="md:col-span-5 lg:col-span-3 relative">
             <button
               onClick={() => {
                 setMonthDropdownOpen(!monthDropdownOpen);
                 setStatusDropdownOpen(false);
               }}
-              className="w-full brutal-btn bg-[#FEFDF8] text-[#121212] px-3.5 py-2 text-sm rounded-lg flex items-center justify-between font-bold border-2 border-[#121212]"
+              className="w-full brutal-btn bg-canvas text-ink px-3.5 py-2 text-sm rounded-lg flex items-center justify-between font-bold border-2 border-ink"
             >
               <span className="flex items-center gap-2 truncate">
-                <Calendar className="w-4 h-4 text-[#71717A] shrink-0" />
+                <Calendar className="w-4 h-4 text-muted shrink-0" />
                 <span className="truncate">{selectedMonthLabel}</span>
               </span>
               <ChevronDown
@@ -353,7 +339,7 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
             </button>
 
             {monthDropdownOpen && (
-              <div className="absolute left-0 top-full mt-1.5 z-40 w-full min-w-[200px] brutal-card rounded-xl bg-white p-1.5 max-h-60 overflow-y-auto">
+              <div className="absolute left-0 top-full mt-1.5 z-40 w-full min-w-[200px] brutal-card rounded-xl bg-surface p-1.5 max-h-60 overflow-y-auto">
                 <button
                   onClick={() => {
                     setSelectedMonth("all");
@@ -361,8 +347,8 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
                   }}
                   className={`w-full text-left px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${
                     selectedMonth === "all"
-                      ? "bg-[#FFEB3B] text-[#121212]"
-                      : "hover:bg-[#F4F4F5] text-[#121212]"
+                      ? "bg-[#FFEB3B] text-on-accent"
+                      : "hover:bg-quiet text-ink"
                   }`}
                 >
                   All Time
@@ -376,8 +362,8 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
                     }}
                     className={`w-full text-left px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${
                       selectedMonth === key
-                        ? "bg-[#FFEB3B] text-[#121212]"
-                        : "hover:bg-[#F4F4F5] text-[#121212]"
+                        ? "bg-[#FFEB3B] text-on-accent"
+                        : "hover:bg-quiet text-ink"
                     }`}
                   >
                     {label}
@@ -388,16 +374,16 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
           </div>
 
           {/* Status Filter */}
-          <div className="md:col-span-3 relative">
+          <div className="md:col-span-5 lg:col-span-3 relative">
             <button
               onClick={() => {
                 setStatusDropdownOpen(!statusDropdownOpen);
                 setMonthDropdownOpen(false);
               }}
-              className="w-full brutal-btn bg-[#FEFDF8] text-[#121212] px-3.5 py-2 text-sm rounded-lg flex items-center justify-between font-bold border-2 border-[#121212]"
+              className="w-full brutal-btn bg-canvas text-ink px-3.5 py-2 text-sm rounded-lg flex items-center justify-between font-bold border-2 border-ink"
             >
               <span className="flex items-center gap-2 truncate">
-                <Filter className="w-4 h-4 text-[#71717A] shrink-0" />
+                <Filter className="w-4 h-4 text-muted shrink-0" />
                 <span className="truncate">{selectedStatusLabel}</span>
               </span>
               <ChevronDown
@@ -406,7 +392,7 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
             </button>
 
             {statusDropdownOpen && (
-              <div className="absolute left-0 top-full mt-1.5 z-40 w-full min-w-[180px] brutal-card rounded-xl bg-white p-1.5">
+              <div className="absolute left-0 top-full mt-1.5 z-40 w-full min-w-[180px] brutal-card rounded-xl bg-surface p-1.5">
                 {statusOptions.map((opt) => (
                   <button
                     key={opt.key}
@@ -416,8 +402,8 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
                     }}
                     className={`w-full text-left px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${
                       selectedStatus === opt.key
-                        ? "bg-[#FFEB3B] text-[#121212]"
-                        : "hover:bg-[#F4F4F5] text-[#121212]"
+                        ? "bg-[#FFEB3B] text-on-accent"
+                        : "hover:bg-quiet text-ink"
                     }`}
                   >
                     {opt.label}
@@ -428,7 +414,7 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
           </div>
 
           {/* Clear Filters Button */}
-          <div className="md:col-span-1 flex items-center">
+          <div className="md:col-span-2 lg:col-span-1 flex items-center">
             {hasActiveFilters ? (
               <Button
                 variant="outline"
@@ -441,7 +427,7 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
                 Clear
               </Button>
             ) : (
-              <div className="text-[11px] font-mono font-bold text-[#71717A] text-center w-full">
+              <div className="text-[11px] font-mono font-bold text-muted text-center w-full">
                 {filteredHackathons.length} result
                 {filteredHackathons.length !== 1 ? "s" : ""}
               </div>
@@ -453,14 +439,14 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
       {/* ── Results Container ── */}
       {filteredHackathons.length === 0 ? (
         /* Empty State */
-        <div className="brutal-card p-12 text-center rounded-2xl bg-white">
-          <div className="w-16 h-16 bg-[#F4F4F5] rounded-2xl border-2 border-[#121212] flex items-center justify-center mx-auto mb-4">
-            <Layers className="w-8 h-8 text-[#71717A]" />
+        <div className="brutal-card p-12 text-center rounded-2xl bg-surface">
+          <div className="w-16 h-16 bg-quiet rounded-2xl border-2 border-ink flex items-center justify-center mx-auto mb-4">
+            <Layers className="w-8 h-8 text-muted" />
           </div>
-          <h3 className="font-black text-xl text-[#121212]">
+          <h3 className="font-black text-xl text-ink">
             No hackathons found
           </h3>
-          <p className="text-sm font-medium text-[#71717A] max-w-md mx-auto mt-2 mb-6">
+          <p className="text-sm font-medium text-muted max-w-md mx-auto mt-2 mb-6">
             {hasActiveFilters
               ? "No hackathons matched your current search and filter criteria. Try clearing filters or using different keywords."
               : "No hackathons have been entered into HackTrack yet. Start by creating your first entry."}
@@ -471,43 +457,43 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
               Reset All Filters
             </Button>
           ) : (
-            <Link href="/hackathons/new">
-              <Button variant="primary">Create Hackathon</Button>
+            <Link href="/hackathons/new" className={buttonVariants()}>
+              Create Hackathon
             </Link>
           )}
         </div>
       ) : (
         <div className="space-y-4">
           {/* Desktop Table View (>= md) */}
-          <div className="hidden md:block brutal-card rounded-2xl bg-white overflow-visible">
+          <div className="hidden md:block brutal-card rounded-2xl bg-surface overflow-visible">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b-3 border-[#121212] bg-[#F4F4F5]">
-                    <th className="py-3.5 px-4 font-mono font-black text-xs uppercase tracking-wider text-[#121212]">
+                  <tr className="border-b-3 border-ink bg-quiet">
+                    <th className="py-3.5 px-4 font-mono font-black text-xs uppercase tracking-wider text-ink">
                       Hackathon
                     </th>
-                    <th className="py-3.5 px-4 font-mono font-black text-xs uppercase tracking-wider text-[#121212]">
+                    <th className="py-3.5 px-4 font-mono font-black text-xs uppercase tracking-wider text-ink">
                       Event Date
                     </th>
-                    <th className="py-3.5 px-4 font-mono font-black text-xs uppercase tracking-wider text-[#121212]">
+                    <th className="py-3.5 px-4 font-mono font-black text-xs uppercase tracking-wider text-ink">
                       Added On
                     </th>
-                    <th className="py-3.5 px-4 font-mono font-black text-xs uppercase tracking-wider text-[#121212]">
+                    <th className="py-3.5 px-4 font-mono font-black text-xs uppercase tracking-wider text-ink">
                       Location
                     </th>
-                    <th className="py-3.5 px-4 font-mono font-black text-xs uppercase tracking-wider text-[#121212] text-center">
+                    <th className="py-3.5 px-4 font-mono font-black text-xs uppercase tracking-wider text-ink text-center">
                       Participants
                     </th>
-                    <th className="py-3.5 px-4 font-mono font-black text-xs uppercase tracking-wider text-[#121212] text-center">
+                    <th className="py-3.5 px-4 font-mono font-black text-xs uppercase tracking-wider text-ink text-center">
                       Status
                     </th>
-                    <th className="py-3.5 px-4 font-mono font-black text-xs uppercase tracking-wider text-[#121212] text-right">
+                    <th className="py-3.5 px-4 font-mono font-black text-xs uppercase tracking-wider text-ink text-right">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y-2 divide-[#121212]">
+                <tbody className="divide-y-2 divide-ink">
                   {paginatedHackathons.map((h) => {
                     const isMenuOpen = activeMenuId === h.id;
                     const isRemoved = h.status === "REMOVED";
@@ -517,7 +503,7 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
                       <tr
                         key={h.id}
                         className={`hover:bg-[#FFEB3B]/10 transition-colors ${
-                          isRemoved ? "opacity-60 bg-[#F4F4F5]/40" : ""
+                          isRemoved ? "opacity-60 bg-quiet/40" : ""
                         }`}
                       >
                         {/* Hackathon name & fee */}
@@ -532,36 +518,36 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
                           </div>
                           <Link
                             href={`/hackathons/${h.id}`}
-                            className="font-black text-sm text-[#121212] hover:underline line-clamp-1"
+                            className="font-black text-sm text-ink hover:underline line-clamp-1"
                           >
                             {h.name}
                           </Link>
-                          <p className="text-xs text-[#71717A] line-clamp-1 font-medium mt-0.5">
+                          <p className="text-xs text-muted line-clamp-1 font-medium mt-0.5">
                             {h.description}
                           </p>
                         </td>
 
                         {/* Event Date */}
-                        <td className="py-3.5 px-4 text-xs font-mono font-bold text-[#121212] whitespace-nowrap">
+                        <td className="py-3.5 px-4 text-xs font-mono font-bold text-ink whitespace-nowrap">
                           {formatDate(h.hackathonDate)}
                         </td>
 
                         {/* Added Date (createdAt) */}
-                        <td className="py-3.5 px-4 text-xs font-mono text-[#71717A] whitespace-nowrap">
+                        <td className="py-3.5 px-4 text-xs font-mono text-muted whitespace-nowrap">
                           {formatDate(h.createdAt)}
                         </td>
 
                         {/* Location */}
-                        <td className="py-3.5 px-4 text-xs font-mono text-[#121212] max-w-[160px] truncate">
+                        <td className="py-3.5 px-4 text-xs font-mono text-ink max-w-[160px] truncate">
                           <span className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-[#71717A] shrink-0" />
+                            <MapPin className="w-3 h-3 text-muted shrink-0" />
                             <span className="truncate">{h.location}</span>
                           </span>
                         </td>
 
                         {/* Participants */}
                         <td className="py-3.5 px-4 text-center">
-                          <span className="inline-flex items-center gap-1 text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-[#F4F4F5] border border-[#121212]">
+                          <span className="inline-flex items-center gap-1 text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-quiet border border-ink">
                             <Users className="w-3 h-3" />
                             {h._count?.participants || 0}
                           </span>
@@ -583,8 +569,10 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
                                 e.stopPropagation();
                                 setActiveMenuId(isMenuOpen ? null : h.id);
                               }}
-                              className="p-1.5 rounded-lg border-2 border-transparent hover:border-[#121212] hover:bg-white text-[#121212] transition-colors"
+                              className="p-1.5 rounded-lg border-2 border-transparent hover:border-ink hover:bg-surface text-ink transition-colors"
                               title="More options"
+                              aria-label={`More options for ${h.name}`}
+                              aria-expanded={isMenuOpen}
                             >
                               <MoreVertical className="w-4 h-4" />
                             </button>
@@ -592,19 +580,19 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
                             {isMenuOpen && (
                               <div
                                 ref={menuRef}
-                                className="absolute right-0 top-full mt-1 z-50 w-44 brutal-card rounded-xl bg-white p-1 text-left shadow-brutal divide-y divide-[#E4E4E7]"
+                                className="absolute right-0 top-full mt-1 z-40 w-44 brutal-card rounded-xl bg-surface p-1 text-left shadow-brutal divide-y divide-subtle"
                               >
                                 <div className="py-1">
                                   <Link
                                     href={`/hackathons/${h.id}`}
-                                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-[#121212] hover:bg-[#F4F4F5] rounded-md transition-colors"
+                                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-ink hover:bg-quiet rounded-md transition-colors"
                                   >
                                     <ArrowUpRight className="w-3.5 h-3.5" />
                                     View Details
                                   </Link>
                                   <Link
                                     href={`/hackathons/${h.id}/edit`}
-                                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-[#121212] hover:bg-[#F4F4F5] rounded-md transition-colors"
+                                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-ink hover:bg-quiet rounded-md transition-colors"
                                   >
                                     <Edit className="w-3.5 h-3.5" />
                                     Edit
@@ -615,7 +603,7 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
                                   {isRemoved || isFlagged ? (
                                     <button
                                       onClick={() => handleOpenDialog("restore", h)}
-                                      className="flex items-center gap-2 w-full text-left px-3 py-1.5 text-xs font-bold text-[#00E676] hover:bg-[#F4F4F5] rounded-md transition-colors"
+                                      className="flex items-center gap-2 w-full text-left px-3 py-1.5 text-xs font-bold text-[#00E676] hover:bg-quiet rounded-md transition-colors"
                                     >
                                       <RotateCcw className="w-3.5 h-3.5" />
                                       Restore to Active
@@ -624,7 +612,7 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
                                     <>
                                       <button
                                         onClick={() => handleOpenDialog("flag", h)}
-                                        className="flex items-center gap-2 w-full text-left px-3 py-1.5 text-xs font-bold text-[#121212] hover:bg-[#F4F4F5] rounded-md transition-colors"
+                                        className="flex items-center gap-2 w-full text-left px-3 py-1.5 text-xs font-bold text-ink hover:bg-quiet rounded-md transition-colors"
                                       >
                                         <Flag className="w-3.5 h-3.5 text-[#FF5252]" />
                                         Flag / Disqualify
@@ -660,13 +648,13 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
               return (
                 <div
                   key={h.id}
-                  className={`brutal-card rounded-2xl p-4 bg-white space-y-3 ${
-                    isRemoved ? "opacity-60 bg-[#F4F4F5]" : ""
+                  className={`brutal-card rounded-2xl p-4 bg-surface space-y-3 ${
+                    isRemoved ? "opacity-60 bg-quiet" : ""
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1.5">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
                         <Badge
                           variant={h.fee.toLowerCase().includes("free") ? "yellow" : "outline"}
                           className="text-[10px]"
@@ -680,72 +668,66 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
                       </div>
                       <Link
                         href={`/hackathons/${h.id}`}
-                        className="font-black text-base text-[#121212] hover:underline"
+                        className="font-black text-base text-ink hover:underline"
                       >
                         {h.name}
                       </Link>
                     </div>
                   </div>
 
-                  <p className="text-xs text-[#71717A] font-medium line-clamp-2">
+                  <p className="text-xs text-muted font-medium line-clamp-2">
                     {h.description}
                   </p>
 
-                  <div className="space-y-1.5 pt-2 border-t-2 border-[#121212] text-xs font-mono">
+                  <div className="space-y-1.5 pt-2 border-t-2 border-ink text-xs font-mono">
                     <div className="flex items-center justify-between">
-                      <span className="text-[#71717A] flex items-center gap-1">
+                      <span className="text-muted flex items-center gap-1">
                         <Clock className="w-3 h-3" /> Event Date:
                       </span>
-                      <strong className="text-[#121212]">
+                      <strong className="text-ink">
                         {formatDate(h.hackathonDate)}
                       </strong>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-[#71717A] flex items-center gap-1">
+                      <span className="text-muted flex items-center gap-1">
                         <Calendar className="w-3 h-3" /> Added:
                       </span>
-                      <span className="text-[#71717A]">
+                      <span className="text-muted">
                         {formatDate(h.createdAt)}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[#71717A] flex items-center gap-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted flex shrink-0 items-center gap-1">
                         <MapPin className="w-3 h-3" /> Location:
                       </span>
-                      <span className="text-[#121212] font-bold">
+                      <span className="min-w-0 truncate text-right text-ink font-bold" title={h.location}>
                         {h.location}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-[#71717A] flex items-center gap-1">
+                      <span className="text-muted flex items-center gap-1">
                         <Users className="w-3 h-3" /> Participants:
                       </span>
-                      <strong className="text-[#121212]">
+                      <strong className="text-ink">
                         {h._count?.participants || 0}
                       </strong>
                     </div>
                   </div>
 
                   {/* Mobile Actions */}
-                  <div className="flex items-center gap-2 pt-3 border-t-2 border-[#121212]">
-                    <Link href={`/hackathons/${h.id}`} className="flex-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full text-xs"
-                      >
-                        Details
-                      </Button>
+                  <div className="flex items-center gap-2 pt-3 border-t-2 border-ink">
+                    <Link
+                      href={`/hackathons/${h.id}`}
+                      className={buttonVariants({ variant: "outline", size: "sm", className: "flex-1" })}
+                    >
+                      Details
                     </Link>
-                    <Link href={`/hackathons/${h.id}/edit`}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs px-2.5"
-                        title="Edit"
-                      >
-                        <Edit className="w-3.5 h-3.5" />
-                      </Button>
+                    <Link
+                      href={`/hackathons/${h.id}/edit`}
+                      className={buttonVariants({ variant: "outline", size: "sm", className: "px-2.5" })}
+                      aria-label={`Edit ${h.name}`}
+                    >
+                      <Edit className="w-3.5 h-3.5" />
                     </Link>
                     {isRemoved || isFlagged ? (
                       <Button
@@ -764,6 +746,7 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
                           size="sm"
                           className="text-xs px-2.5"
                           title="Flag"
+                          aria-label={`Flag ${h.name}`}
                           onClick={() => handleOpenDialog("flag", h)}
                         >
                           <Flag className="w-3.5 h-3.5 text-[#FF5252]" />
@@ -773,6 +756,7 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
                           size="sm"
                           className="text-xs px-2.5"
                           title="Remove"
+                          aria-label={`Remove ${h.name}`}
                           onClick={() => handleOpenDialog("delete", h)}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -787,23 +771,23 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
 
           {/* ── Pagination Controls ── */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 px-1">
-            <div className="text-xs font-mono font-bold text-[#71717A]">
+            <div className="text-xs font-mono font-bold text-muted">
               Showing{" "}
-              <span className="text-[#121212]">
+              <span className="text-ink">
                 {Math.min(
                   (currentPage - 1) * itemsPerPage + 1,
                   filteredHackathons.length
                 )}
               </span>{" "}
               to{" "}
-              <span className="text-[#121212]">
+              <span className="text-ink">
                 {Math.min(
                   currentPage * itemsPerPage,
                   filteredHackathons.length
                 )}
               </span>{" "}
               of{" "}
-              <span className="text-[#121212]">
+              <span className="text-ink">
                 {filteredHackathons.length}
               </span>{" "}
               hackathons
@@ -821,7 +805,7 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
                 Previous
               </Button>
 
-              <div className="px-3 py-1 font-mono text-xs font-black bg-white rounded-lg border-2 border-[#121212]">
+              <div className="px-3 py-1 font-mono text-xs font-black bg-surface rounded-lg border-2 border-ink">
                 {currentPage} / {totalPages}
               </div>
 
@@ -884,6 +868,6 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
             : "primary"
         }
       />
-    </div>
+    </PageShell>
   );
 }

@@ -2,9 +2,10 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { extractHackathonWithAI } from "@/lib/ai-extractor";
+import { recordActivity } from "@/lib/activity";
 
 const HackathonSchema = z.object({
   name: z.string().min(2, "Hackathon name must be at least 2 characters"),
@@ -17,16 +18,19 @@ const HackathonSchema = z.object({
   registrationLink: z.string().url("Must be a valid URL").optional().or(z.literal("")),
 });
 
-async function requireAdmin() {
-  const session = await getSession();
-  if (!session) {
-    throw new Error("Unauthorized. Please log in as Admin.");
+/** Throws unless the hackathon exists and belongs to the user. */
+async function assertOwnsHackathon(userId: string, id: string) {
+  const owned = await prisma.hackathon.findFirst({
+    where: { id, userId },
+    select: { id: true },
+  });
+  if (!owned) {
+    throw new Error("Hackathon not found.");
   }
-  return session;
 }
 
 export async function getDashboardMetrics() {
-  await requireAdmin();
+  const { userId } = await requireUser();
 
   const [
     totalHackathons,
@@ -35,9 +39,10 @@ export async function getDashboardMetrics() {
     scheduledMessagesCount,
     sentMessagesCount,
   ] = await Promise.all([
-    prisma.hackathon.count(),
+    prisma.hackathon.count({ where: { userId } }),
     prisma.hackathon.findMany({
       where: {
+        userId,
         hackathonDate: {
           gte: new Date(),
         },
@@ -55,12 +60,12 @@ export async function getDashboardMetrics() {
       },
       take: 5,
     }),
-    prisma.participant.count(),
+    prisma.participant.count({ where: { hackathon: { userId } } }),
     prisma.scheduledMessage.count({
-      where: { status: "SCHEDULED" },
+      where: { status: "SCHEDULED", hackathon: { userId } },
     }),
     prisma.scheduledMessage.count({
-      where: { status: "SENT" },
+      where: { status: "SENT", hackathon: { userId } },
     }),
   ]);
 
@@ -77,10 +82,11 @@ export async function getDashboardMetrics() {
 }
 
 export async function getDashboardData() {
-  await requireAdmin();
+  const { userId } = await requireUser();
 
   const allHackathons = await prisma.hackathon.findMany({
     where: {
+      userId,
       status: "ACTIVE",
     },
     include: {
@@ -97,11 +103,11 @@ export async function getDashboardData() {
   });
 
   const scheduledMessagesCount = await prisma.scheduledMessage.count({
-    where: { status: "SCHEDULED" },
+    where: { status: "SCHEDULED", hackathon: { userId } },
   });
 
   const sentMessagesCount = await prisma.scheduledMessage.count({
-    where: { status: "SENT" },
+    where: { status: "SENT", hackathon: { userId } },
   });
 
   return {
@@ -112,9 +118,10 @@ export async function getDashboardData() {
 }
 
 export async function getHackathons() {
-  await requireAdmin();
+  const { userId } = await requireUser();
   return prisma.hackathon.findMany({
     where: {
+      userId,
       status: "ACTIVE",
     },
     include: {
@@ -132,9 +139,9 @@ export async function getHackathons() {
 }
 
 export async function getHackathonById(id: string) {
-  await requireAdmin();
-  return prisma.hackathon.findUnique({
-    where: { id },
+  const { userId } = await requireUser();
+  return prisma.hackathon.findFirst({
+    where: { id, userId },
     include: {
       participants: {
         orderBy: { createdAt: "desc" },
@@ -177,7 +184,7 @@ export async function checkHackathonDateConflict(
   dateString: string,
   excludeId?: string
 ): Promise<DateConflictCheckResult> {
-  await requireAdmin();
+  const { userId } = await requireUser();
 
   if (!dateString || typeof dateString !== "string") {
     return { hasConflict: false, conflicts: [] };
@@ -209,6 +216,7 @@ export async function checkHackathonDateConflict(
 
   const candidates = await prisma.hackathon.findMany({
     where: {
+      userId,
       status: { not: "REMOVED" },
       deletedAt: null,
       ...(excludeId ? { id: { not: excludeId } } : {}),
@@ -261,7 +269,7 @@ export async function checkHackathonDateConflict(
 }
 
 export async function createHackathon(formData: FormData) {
-  await requireAdmin();
+  const { userId } = await requireUser();
 
   const rawData = {
     name: formData.get("name") as string,
@@ -300,6 +308,7 @@ export async function createHackathon(formData: FormData) {
   try {
     const hackathon = await prisma.hackathon.create({
       data: {
+        userId,
         name: validated.data.name,
         description: validated.data.description,
         roundDetails: validated.data.roundDetails,
@@ -312,7 +321,7 @@ export async function createHackathon(formData: FormData) {
     });
 
     // Parse and register initial participants if provided
-    const createdParticipants: { id: string; email: string }[] = [];
+    const createdParticipants: { id: string; email: string; createdAt: Date }[] = [];
     if (initialParticipantsRaw) {
       const lines = initialParticipantsRaw.split("\n");
       for (const line of lines) {
@@ -345,7 +354,7 @@ export async function createHackathon(formData: FormData) {
               email,
             },
           });
-          createdParticipants.push({ id: p.id, email: p.email });
+          createdParticipants.push({ id: p.id, email: p.email, createdAt: p.createdAt });
         }
       }
     }
@@ -376,6 +385,17 @@ export async function createHackathon(formData: FormData) {
       }
     }
 
+    // Streak activity: only after everything above succeeded
+    await recordActivity([
+      { userId, kind: "HACKATHON_CREATED", refId: hackathon.id, occurredAt: hackathon.createdAt },
+      ...createdParticipants.map((p) => ({
+        userId,
+        kind: "PARTICIPANT_ADDED" as const,
+        refId: p.id,
+        occurredAt: p.createdAt,
+      })),
+    ]);
+
     revalidatePath("/dashboard");
     revalidatePath("/hackathons");
     return { success: true, hackathonId: hackathon.id };
@@ -385,7 +405,7 @@ export async function createHackathon(formData: FormData) {
 }
 
 export async function updateHackathon(id: string, formData: FormData) {
-  await requireAdmin();
+  const { userId } = await requireUser();
 
   const rawData = {
     name: formData.get("name") as string,
@@ -417,6 +437,7 @@ export async function updateHackathon(id: string, formData: FormData) {
   }
 
   try {
+    await assertOwnsHackathon(userId, id);
     await prisma.hackathon.update({
       where: { id },
       data: {
@@ -441,8 +462,9 @@ export async function updateHackathon(id: string, formData: FormData) {
 }
 
 export async function deleteHackathon(id: string) {
-  await requireAdmin();
+  const { userId } = await requireUser();
   try {
+    await assertOwnsHackathon(userId, id);
     await prisma.hackathon.update({
       where: { id },
       data: {
@@ -462,8 +484,9 @@ export async function deleteHackathon(id: string) {
 export const softDeleteHackathon = deleteHackathon;
 
 export async function getHistoryHackathons() {
-  await requireAdmin();
+  const { userId } = await requireUser();
   return prisma.hackathon.findMany({
+    where: { userId },
     include: {
       _count: {
         select: {
@@ -479,8 +502,9 @@ export async function getHistoryHackathons() {
 }
 
 export async function flagHackathon(id: string) {
-  await requireAdmin();
+  const { userId } = await requireUser();
   try {
+    await assertOwnsHackathon(userId, id);
     await prisma.hackathon.update({
       where: { id },
       data: { status: "FLAGGED" },
@@ -495,8 +519,9 @@ export async function flagHackathon(id: string) {
 }
 
 export async function restoreHackathon(id: string) {
-  await requireAdmin();
+  const { userId } = await requireUser();
   try {
+    await assertOwnsHackathon(userId, id);
     await prisma.hackathon.update({
       where: { id },
       data: {
@@ -514,7 +539,7 @@ export async function restoreHackathon(id: string) {
 }
 
 export async function extractAndCheckHackathonAction(rawText: string) {
-  await requireAdmin();
+  const { userId } = await requireUser();
 
   if (!rawText || !rawText.trim()) {
     return { error: "Please provide text to extract hackathon information from." };
@@ -554,7 +579,7 @@ export async function extractAndCheckHackathonAction(rawText: string) {
 }
 
 export async function getAiEngineStatusAction() {
-  await requireAdmin();
+  const { userId } = await requireUser();
   const hasGemini = !!process.env.GEMINI_API_KEY;
   const hasOpenAI = !!process.env.OPENAI_API_KEY;
   const hasGroq = !!process.env.GROQ_API_KEY;

@@ -10,6 +10,7 @@ import {
 } from "@/actions/google";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { SectionHeader } from "@/components/ui/page-header";
 import {
   Mail,
   CheckCircle2,
@@ -98,47 +99,36 @@ export function GoogleConnectCard({ initialAccount }: Props) {
   }
 
   return (
-    <div className="brutal-card rounded-2xl p-6 md:p-8 bg-white space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b-3 border-[#121212]">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-[#FFEB3B] border-3 border-[#121212] shadow-brutal-sm flex items-center justify-center font-black rounded-xl">
-            <Mail className="w-6 h-6 text-[#121212]" />
-          </div>
-          <div>
-            <h2 className="text-xl font-black text-[#121212] tracking-tight">
-              Gmail Dispatch Integration
-            </h2>
-            <p className="text-xs font-bold text-[#71717A]">
-              Connect via Google OAuth to allow background email broadcasting.
-            </p>
-          </div>
-        </div>
-
-        <div>
-          {account ? (
-            <Badge variant="mint" className="text-xs py-1 px-3">
-              ● {account.isDemo ? "Demo Connected" : "Google Connected"}
+    <section className="brutal-card rounded-2xl p-5 sm:p-6 md:p-8 bg-surface">
+      <SectionHeader
+        icon={Mail}
+        title="Gmail sending"
+        subtitle="Connect via Google OAuth so scheduled broadcasts go out from your inbox."
+        actions={
+          account ? (
+            <Badge variant="mint" className="py-1 px-3">
+              ● {account.isDemo ? "Demo connected" : "Connected"}
             </Badge>
           ) : (
-            <Badge variant="coral" className="text-xs py-1 px-3">
-              ✕ Disconnected
+            <Badge variant="coral" className="py-1 px-3">
+              ✕ Not connected
             </Badge>
-          )}
-        </div>
-      </div>
+          )
+        }
+      />
 
       {account ? (
         <div className="space-y-6">
           <div className="p-4 bg-[#00E676]/10 border-2 border-[#00E676] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#00E676] border-2 border-[#121212] rounded-lg flex items-center justify-center">
-                <CheckCircle2 className="w-5 h-5 text-[#121212]" />
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="w-10 h-10 shrink-0 bg-[#00E676] text-on-accent border-2 border-ink rounded-lg flex items-center justify-center">
+                <CheckCircle2 className="w-5 h-5 text-ink" />
               </div>
-              <div>
-                <span className="text-[10px] font-mono uppercase tracking-wider text-[#71717A] block font-bold">
+              <div className="min-w-0">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-muted block font-bold">
                   Active Broadcasting Account {account.isDemo && "(Simulation Mode)"}
                 </span>
-                <strong className="text-base text-[#121212] font-mono font-bold">
+                <strong className="block break-all text-sm sm:text-base text-ink font-mono font-bold">
                   {account.email}
                 </strong>
               </div>
@@ -149,14 +139,14 @@ export function GoogleConnectCard({ initialAccount }: Props) {
               size="sm"
               onClick={handleDisconnect}
               disabled={loading}
-              className="gap-1.5"
+              className="w-full gap-1.5 sm:w-auto sm:shrink-0"
             >
               <LogOut className="w-4 h-4" />
               {loading ? "Disconnecting..." : "Disconnect Account"}
             </Button>
           </div>
 
-          <div className="flex items-start gap-2.5 text-xs text-[#71717A] font-medium">
+          <div className="flex items-start gap-2.5 text-xs text-muted font-medium">
             <ShieldCheck className="w-4 h-4 text-[#00E676] shrink-0 mt-0.5" />
             <span>
               {account.isDemo
@@ -167,22 +157,22 @@ export function GoogleConnectCard({ initialAccount }: Props) {
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="p-4 bg-[#FF5252]/10 border-2 border-[#FF5252] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="p-4 bg-[#FF5252]/10 border-2 border-[#FF5252] rounded-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#FF5252] text-white border-2 border-[#121212] rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 shrink-0 bg-[#FF5252] text-white border-2 border-ink rounded-lg flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="font-bold text-sm text-[#121212]">
+                <h4 className="font-bold text-sm text-ink">
                   No Gmail Account Connected
                 </h4>
-                <p className="text-xs text-[#71717A] font-medium">
+                <p className="text-xs text-muted font-medium">
                   Connect your Google account to grant permissions for automated email delivery.
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:shrink-0 [&>*]:w-full sm:[&>*]:w-auto">
               <Button
                 variant="mint"
                 size="md"
@@ -192,7 +182,7 @@ export function GoogleConnectCard({ initialAccount }: Props) {
                 title="Connect instant demo account to test scheduling right away"
               >
                 <Zap className="w-4 h-4" />
-                Connect Demo Account (Instant)
+                Use demo account
               </Button>
 
               <Button
@@ -204,16 +194,16 @@ export function GoogleConnectCard({ initialAccount }: Props) {
                 title="Connect via official Google Cloud OAuth"
               >
                 <ExternalLink className="w-4 h-4" />
-                {loading ? "Redirecting..." : "Connect Official Gmail"}
+                {loading ? "Redirecting..." : "Connect Gmail"}
               </Button>
             </div>
           </div>
 
-          <p className="text-xs font-medium text-[#71717A]">
-            * Note: If using official Google OAuth, ensure <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code> are set in your <code>hacktrack/.env</code> file. Or click <strong>Connect Demo Account (Instant)</strong> to test full end-to-end background scheduling right now!
+          <p className="text-xs font-medium text-muted">
+            * Note: If using official Google OAuth, ensure <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code> are set in your <code>hacktrack/.env</code> file. Or click <strong>Use demo account</strong> to test full end-to-end background scheduling right now!
           </p>
         </div>
       )}
-    </div>
+    </section>
   );
 }

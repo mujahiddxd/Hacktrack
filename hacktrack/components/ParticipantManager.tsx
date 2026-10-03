@@ -6,6 +6,7 @@ import { addParticipant, deleteParticipant } from "@/actions/participants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { SectionHeader } from "@/components/ui/page-header";
 import { ParticipantType } from "@/types";
 import { Users, UserPlus, Trash2, Mail, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
@@ -59,46 +60,34 @@ export function ParticipantManager({ hackathonId, initialParticipants }: Props) 
   }
 
   return (
-    <div className="brutal-card rounded-2xl p-6 bg-white space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b-2 border-[#121212]">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-[#00E676] text-[#121212] rounded-lg border-2 border-[#121212]">
-            <Users className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="font-black text-xl text-[#121212] flex items-center gap-2">
-              Participants
-              <Badge variant="mint" className="text-xs">
-                {initialParticipants.length} Registered
-              </Badge>
-            </h3>
-            <p className="text-xs text-[#71717A] font-medium">
-              Registered builders eligible for email alerts and updates.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant={isAdding ? "outline" : "primary"}
-            size="sm"
-            onClick={() => setIsAdding(!isAdding)}
-            className="gap-1.5"
-          >
-            <UserPlus className="w-4 h-4" />
-            {isAdding ? "Close Form" : "+ Add Participant"}
+    <section className="brutal-card rounded-2xl bg-surface p-5 sm:p-6 space-y-5">
+      <SectionHeader
+        className="mb-0"
+        icon={Users}
+        iconClassName="bg-[#00E676] text-on-accent"
+        title={
+          <>
+            Participants
+            <Badge variant="mint">{initialParticipants.length} registered</Badge>
+          </>
+        }
+        subtitle="Registered builders eligible for email alerts and updates."
+        actions={
+          <Button variant={isAdding ? "outline" : "primary"} size="sm" onClick={() => setIsAdding(!isAdding)}>
+            <UserPlus className="h-4 w-4" />
+            {isAdding ? "Close form" : "Add participant"}
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Add Participant Drawer / Form */}
       {isAdding && (
         <form
           onSubmit={handleAdd}
-          className="p-4 bg-[#FFEB3B]/20 border-2 border-[#121212] rounded-xl space-y-4"
+          className="p-4 bg-[#FFEB3B]/20 border-2 border-ink rounded-xl space-y-4"
         >
-          <div className="font-bold text-xs uppercase tracking-wider text-[#121212] flex items-center gap-1.5">
-            <UserPlus className="w-4 h-4 text-[#121212]" />
+          <div className="font-bold text-xs uppercase tracking-wider text-ink flex items-center gap-1.5">
+            <UserPlus className="w-4 h-4 text-ink" />
             Register Participant
           </div>
 
@@ -118,7 +107,7 @@ export function ParticipantManager({ hackathonId, initialParticipants }: Props) 
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
             <Button
               type="button"
               variant="outline"
@@ -155,12 +144,12 @@ export function ParticipantManager({ hackathonId, initialParticipants }: Props) 
 
       {/* Participant List */}
       {initialParticipants.length === 0 ? (
-        <div className="text-center py-8 border-2 border-dashed border-[#121212] rounded-xl bg-neutral-50 p-6">
-          <Users className="w-8 h-8 text-[#71717A] mx-auto mb-2" />
-          <p className="font-bold text-sm text-[#121212]">
+        <div className="text-center py-8 border-2 border-dashed border-ink rounded-xl bg-quiet p-6">
+          <Users className="w-8 h-8 text-muted mx-auto mb-2" />
+          <p className="font-bold text-sm text-ink">
             No participants registered yet
           </p>
-          <p className="text-xs text-[#71717A] max-w-xs mx-auto mt-1 mb-4">
+          <p className="text-xs text-muted max-w-xs mx-auto mt-1 mb-4">
             Add developers using their Gmail address to schedule automated hackathon reminders.
           </p>
           <Button
@@ -174,42 +163,74 @@ export function ParticipantManager({ hackathonId, initialParticipants }: Props) 
           </Button>
         </div>
       ) : (
-        <div className="overflow-x-auto border-2 border-[#121212] rounded-xl">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-[#121212] text-white text-xs font-mono uppercase">
-              <tr>
-                <th className="px-4 py-3">Builder</th>
-                <th className="px-4 py-3">Gmail Address</th>
-                <th className="px-4 py-3 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y-2 divide-[#121212] font-medium">
-              {filtered.map((p) => (
-                <tr key={p.id} className="hover:bg-neutral-50 transition-colors">
-                  <td className="px-4 py-3">
-                    <div className="font-bold text-[#121212]">{p.name}</div>
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-[#71717A]">
-                    <span className="flex items-center gap-1.5 text-[#121212]">
-                      <Mail className="w-3.5 h-3.5 text-[#71717A]" />
-                      {p.email}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => handleDelete(p.id, p.name)}
-                      className="p-1.5 text-[#FF5252] hover:bg-red-50 rounded-md border border-transparent hover:border-[#FF5252] transition-colors"
-                      title="Remove participant"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
+        <>
+          {filtered.length === 0 && (
+            <p className="py-6 text-center text-sm font-medium text-muted">No participants match “{search}”.</p>
+          )}
+
+          {/* Phones: stacked rows, nothing scrolls sideways */}
+          <ul className="divide-y-2 divide-ink overflow-hidden rounded-xl border-2 border-ink md:hidden">
+            {filtered.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-3 p-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-ink">{p.name}</p>
+                  <p className="flex items-center gap-1.5 truncate font-mono text-xs text-body">
+                    <Mail className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{p.email}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDelete(p.id, p.name)}
+                  className="shrink-0 rounded-md border-2 border-transparent p-2 text-[#FF5252] transition-colors hover:border-[#FF5252] hover:bg-tint-coral"
+                  aria-label={`Remove ${p.name}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          {/* md+: table */}
+          <div className="hidden overflow-hidden rounded-xl border-2 border-ink md:block">
+            <table className="w-full table-fixed text-left text-sm">
+              <thead className="bg-[#121212] font-mono text-xs uppercase text-white">
+                <tr>
+                  <th className="w-2/5 px-4 py-3">Builder</th>
+                  <th className="px-4 py-3">Email</th>
+                  <th className="w-20 px-4 py-3 text-right">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y-2 divide-ink font-medium">
+                {filtered.map((p) => (
+                  <tr key={p.id} className="transition-colors hover:bg-quiet">
+                    <td className="truncate px-4 py-3 font-bold text-ink">{p.name}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-ink">
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <Mail className="h-3.5 w-3.5 shrink-0 text-muted" />
+                        <span className="truncate" title={p.email}>
+                          {p.email}
+                        </span>
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => handleDelete(p.id, p.name)}
+                        className="rounded-md border border-transparent p-1.5 text-[#FF5252] transition-colors hover:border-[#FF5252] hover:bg-tint-coral"
+                        aria-label={`Remove ${p.name}`}
+                        title="Remove participant"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
-    </div>
+    </section>
   );
 }

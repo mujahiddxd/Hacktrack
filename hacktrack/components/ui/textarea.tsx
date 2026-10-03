@@ -10,14 +10,15 @@ export interface TextareaProps
 
 export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ className, label, error, helperText, id, rows = 4, ...props }, ref) => {
-    const textareaId = id || React.useId();
+    const generatedId = React.useId();
+    const textareaId = id || generatedId;
 
     return (
       <div className="w-full space-y-1.5">
         {label && (
           <label
             htmlFor={textareaId}
-            className="block text-xs font-bold uppercase tracking-wider text-[#121212]"
+            className="block text-xs font-bold uppercase tracking-wider text-ink"
           >
             {label}
           </label>
@@ -28,13 +29,13 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           rows={rows}
           className={cn(
             "brutal-input rounded-lg text-sm resize-y font-normal",
-            error && "border-[#FF5252] bg-red-50 focus:shadow-[3px_3px_0px_#FF5252]",
+            error && "border-[#FF5252] bg-tint-coral focus:shadow-[3px_3px_0px_#FF5252]",
             className
           )}
           {...props}
         />
         {helperText && !error && (
-          <p className="text-xs text-[#71717A] font-medium">{helperText}</p>
+          <p className="text-xs text-muted font-medium">{helperText}</p>
         )}
         {error && (
           <p className="text-xs font-bold text-[#FF5252]">{error}</p>

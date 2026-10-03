@@ -12,12 +12,12 @@ export function Badge({
   ...props
 }: BadgeProps) {
   const variantStyles = {
-    yellow: "bg-[#FFEB3B] text-[#121212]",
+    yellow: "bg-[#FFEB3B] text-on-accent",
     coral: "bg-[#FF5252] text-white",
     blue: "bg-[#2196F3] text-white",
-    mint: "bg-[#00E676] text-[#121212]",
+    mint: "bg-[#00E676] text-on-accent",
     neutral: "bg-[#121212] text-white",
-    outline: "bg-white text-[#121212]",
+    outline: "bg-surface text-ink",
   };
 
   return (

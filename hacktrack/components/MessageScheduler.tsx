@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge, StatusBadge } from "@/components/ui/badge";
+import { SectionHeader } from "@/components/ui/page-header";
 import { formatDateTime } from "@/lib/utils";
 import { ParticipantType, ScheduledMessageType } from "@/types";
 import {
@@ -126,59 +127,45 @@ export function MessageScheduler({
   };
 
   return (
-    <div className="brutal-card rounded-2xl p-6 bg-white space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b-2 border-[#121212]">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-[#FFEB3B] text-[#121212] rounded-lg border-2 border-[#121212]">
-            <Send className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="font-black text-xl text-[#121212] flex items-center gap-2">
-              Scheduled Email Broadcasts
-              <Badge variant="yellow" className="text-xs">
-                {initialMessages.length} Messages
-              </Badge>
-            </h3>
-            <p className="text-xs text-[#71717A] font-medium">
-              Automated reminders dispatched through your connected Gmail account.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleManualDispatch}
-            disabled={isDispatching}
-            className="gap-1.5"
-            title="Trigger check for due messages"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isDispatching ? "animate-spin" : ""}`} />
-            Check Due
-          </Button>
-
-          <Button
-            variant={isScheduling ? "outline" : "primary"}
-            size="sm"
-            onClick={() => setIsScheduling(!isScheduling)}
-            className="gap-1.5"
-          >
-            <Calendar className="w-4 h-4" />
-            {isScheduling ? "Close Form" : "+ Schedule Message"}
-          </Button>
-        </div>
-      </div>
+    <section className="brutal-card rounded-2xl bg-surface p-5 sm:p-6 space-y-5">
+      <SectionHeader
+        className="mb-0"
+        icon={Send}
+        title={
+          <>
+            Email broadcasts
+            <Badge variant="yellow">{initialMessages.length} messages</Badge>
+          </>
+        }
+        subtitle="Automated reminders dispatched through your connected Gmail account."
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleManualDispatch}
+              disabled={isDispatching}
+              title="Send any messages that are already due"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isDispatching ? "animate-spin" : ""}`} />
+              Check due
+            </Button>
+            <Button variant={isScheduling ? "outline" : "primary"} size="sm" onClick={() => setIsScheduling(!isScheduling)}>
+              <Calendar className="h-4 w-4" />
+              {isScheduling ? "Close form" : "Schedule message"}
+            </Button>
+          </>
+        }
+      />
 
       {/* Schedule Form */}
       {isScheduling && (
         <form
           onSubmit={handleSchedule}
-          className="p-5 bg-[#FFEB3B]/15 border-2 border-[#121212] rounded-xl space-y-4"
+          className="p-4 sm:p-5 bg-[#FFEB3B]/15 border-2 border-ink rounded-xl space-y-4"
         >
-          <div className="font-bold text-xs uppercase tracking-wider text-[#121212] flex items-center gap-1.5">
-            <Sparkles className="w-4 h-4 text-[#121212]" />
+          <div className="font-bold text-xs uppercase tracking-wider text-ink flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-ink" />
             Compose Scheduled Broadcast
           </div>
 
@@ -201,13 +188,13 @@ export function MessageScheduler({
                 defaultValue={`Hi {name},\n\nThis is an automated update regarding ${hackathonName}. Please be ready with your environment configured.\n\nBest regards,\nOrganizing Team`}
               />
               <div className="flex flex-wrap gap-2 mt-1.5">
-                <span className="text-[11px] font-mono text-[#71717A]">
+                <span className="text-[11px] font-mono text-muted">
                   Dynamic tags:
                 </span>
-                <span className="text-[11px] font-mono font-bold bg-white px-1.5 py-0.5 border border-[#121212] rounded">
+                <span className="text-[11px] font-mono font-bold bg-surface px-1.5 py-0.5 border border-ink rounded">
                   {"{name}"}
                 </span>
-                <span className="text-[11px] font-mono font-bold bg-white px-1.5 py-0.5 border border-[#121212] rounded">
+                <span className="text-[11px] font-mono font-bold bg-surface px-1.5 py-0.5 border border-ink rounded">
                   {"{hackathonName}"}
                 </span>
               </div>
@@ -224,17 +211,17 @@ export function MessageScheduler({
               />
 
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#121212]">
+                <label className="block text-xs font-bold uppercase tracking-wider text-ink">
                   Recipients
                 </label>
-                <div className="flex items-center gap-3 pt-2">
+                <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:flex-wrap sm:gap-4 sm:pt-2">
                   <label className="flex items-center gap-1.5 text-xs font-bold cursor-pointer">
                     <input
                       type="radio"
                       name="recipientModeRadio"
                       checked={recipientMode === "all"}
                       onChange={() => setRecipientMode("all")}
-                      className="accent-[#121212]"
+                      className="accent-ink"
                     />
                     All Participants ({participants.length})
                   </label>
@@ -244,7 +231,7 @@ export function MessageScheduler({
                       name="recipientModeRadio"
                       checked={recipientMode === "selected"}
                       onChange={() => setRecipientMode("selected")}
-                      className="accent-[#121212]"
+                      className="accent-ink"
                     />
                     Select Specific ({selectedIds.length})
                   </label>
@@ -254,9 +241,9 @@ export function MessageScheduler({
 
             {/* Recipient selection list */}
             {recipientMode === "selected" && (
-              <div className="border-2 border-[#121212] rounded-lg p-3 bg-white max-h-48 overflow-y-auto space-y-2">
-                <div className="flex items-center justify-between pb-2 border-b border-[#121212]">
-                  <span className="text-xs font-bold text-[#71717A]">
+              <div className="border-2 border-ink rounded-lg p-3 bg-surface max-h-48 overflow-y-auto space-y-2">
+                <div className="flex items-center justify-between pb-2 border-b border-ink">
+                  <span className="text-xs font-bold text-muted">
                     Select Recipients
                   </span>
                   <button
@@ -270,23 +257,23 @@ export function MessageScheduler({
                 {participants.map((p) => (
                   <label
                     key={p.id}
-                    className="flex items-center gap-2 text-xs font-medium cursor-pointer hover:bg-neutral-50 p-1 rounded"
+                    className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-medium cursor-pointer hover:bg-quiet p-1 rounded"
                   >
                     <input
                       type="checkbox"
                       checked={selectedIds.includes(p.id)}
                       onChange={() => toggleSelect(p.id)}
-                      className="accent-[#121212]"
+                      className="accent-ink"
                     />
-                    <span className="font-bold text-[#121212]">{p.name}</span>
-                    <span className="text-[#71717A] font-mono text-[11px]">({p.email})</span>
+                    <span className="font-bold text-ink">{p.name}</span>
+                    <span className="min-w-0 truncate text-muted font-mono text-[11px]">{p.email}</span>
                   </label>
                 ))}
               </div>
             )}
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-[#121212]">
+          <div className="flex flex-col-reverse gap-2 pt-3 border-t border-ink sm:flex-row sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
             <Button
               type="button"
               variant="outline"
@@ -311,12 +298,12 @@ export function MessageScheduler({
 
       {/* Messages List */}
       {initialMessages.length === 0 ? (
-        <div className="text-center py-8 border-2 border-dashed border-[#121212] rounded-xl bg-neutral-50 p-6">
-          <Mail className="w-8 h-8 text-[#71717A] mx-auto mb-2" />
-          <p className="font-bold text-sm text-[#121212]">
+        <div className="text-center py-8 border-2 border-dashed border-ink rounded-xl bg-quiet p-6">
+          <Mail className="w-8 h-8 text-muted mx-auto mb-2" />
+          <p className="font-bold text-sm text-ink">
             No messages scheduled yet
           </p>
-          <p className="text-xs text-[#71717A] max-w-xs mx-auto mt-1 mb-4">
+          <p className="text-xs text-muted max-w-xs mx-auto mt-1 mb-4">
             Schedule announcements, guidelines, or round start reminders to be sent automatically.
           </p>
           <Button
@@ -344,14 +331,14 @@ export function MessageScheduler({
             return (
               <div
                 key={msg.id}
-                className="border-2 border-[#121212] rounded-xl bg-white overflow-hidden shadow-brutal-sm"
+                className="border-2 border-ink rounded-xl bg-surface overflow-hidden shadow-brutal-sm"
               >
                 {/* Header row */}
                 <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                       <StatusBadge status={msg.status} />
-                      <span className="text-xs font-mono font-bold text-[#71717A] flex items-center gap-1">
+                      <span className="text-xs font-mono font-bold text-muted flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />
                         Scheduled for: {formatDateTime(msg.scheduledAt)}
                       </span>
@@ -362,15 +349,15 @@ export function MessageScheduler({
                         </span>
                       )}
                     </div>
-                    <h4 className="font-bold text-base text-[#121212] pt-1">
+                    <h4 className="break-words font-bold text-base text-ink pt-1">
                       {msg.subject}
                     </h4>
-                    <p className="text-xs text-[#71717A] line-clamp-1">
+                    <p className="text-xs text-muted line-clamp-1">
                       {msg.message}
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 md:shrink-0">
                     {msg.status === "SCHEDULED" && (
                       <Button
                         variant="secondary"
@@ -406,42 +393,42 @@ export function MessageScheduler({
 
                 {/* Delivery breakdown drawer */}
                 {isExpanded && (
-                  <div className="p-4 bg-neutral-50 border-t-2 border-[#121212] space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-neutral-300">
-                      <div className="flex items-center gap-3 text-xs font-mono font-bold">
-                        <span className="text-[#00E676] bg-green-100 px-2 py-0.5 border border-[#121212] rounded">
+                  <div className="p-4 bg-quiet border-t-2 border-ink space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-subtle">
+                      <div className="flex flex-wrap items-center gap-2 text-xs font-mono font-bold">
+                        <span className="text-[#00E676] bg-tint-mint px-2 py-0.5 border border-ink rounded">
                           SENT: {sentCount}
                         </span>
-                        <span className="text-[#FF5252] bg-red-100 px-2 py-0.5 border border-[#121212] rounded">
+                        <span className="text-[#FF5252] bg-tint-coral px-2 py-0.5 border border-ink rounded">
                           FAILED: {failedCount}
                         </span>
-                        <span className="text-[#2196F3] bg-blue-100 px-2 py-0.5 border border-[#121212] rounded">
+                        <span className="text-[#2196F3] bg-tint-blue px-2 py-0.5 border border-ink rounded">
                           PENDING: {pendingCount}
                         </span>
                       </div>
-                      <span className="text-xs font-mono text-[#71717A]">
+                      <span className="text-xs font-mono text-muted">
                         Total Recipients: {recipientCount}
                       </span>
                     </div>
 
                     {msg.recipients && msg.recipients.length > 0 ? (
-                      <div className="max-h-56 overflow-y-auto divide-y divide-neutral-200 text-xs">
+                      <div className="max-h-56 overflow-y-auto divide-y divide-subtle text-xs">
                         {msg.recipients.map((rec) => (
                           <div
                             key={rec.id}
-                            className="py-2 flex items-center justify-between gap-3"
+                            className="py-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                           >
-                            <div className="flex items-center gap-2">
-                              <User className="w-3.5 h-3.5 text-[#71717A]" />
-                              <strong className="text-[#121212]">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <User className="w-3.5 h-3.5 shrink-0 text-muted" />
+                              <strong className="shrink-0 text-ink">
                                 {rec.participant?.name || "Participant"}
                               </strong>
-                              <span className="text-[#71717A] font-mono">
-                                ({rec.participant?.email})
+                              <span className="min-w-0 truncate text-muted font-mono">
+                                {rec.participant?.email}
                               </span>
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2 pl-5 sm:pl-0 sm:shrink-0">
                               {rec.status === "SENT" && (
                                 <span className="inline-flex items-center gap-1 font-mono font-bold text-[#00E676]">
                                   <CheckCircle2 className="w-3 h-3" />
@@ -463,13 +450,13 @@ export function MessageScheduler({
                                 </span>
                               )}
                               {rec.status === "PENDING" && (
-                                <span className="inline-flex items-center gap-1 font-mono font-bold text-[#71717A]">
+                                <span className="inline-flex items-center gap-1 font-mono font-bold text-muted">
                                   <Clock className="w-3 h-3" />
                                   PENDING
                                 </span>
                               )}
                               {rec.sentAt && (
-                                <span className="text-[10px] font-mono text-[#71717A]">
+                                <span className="text-[10px] font-mono text-muted">
                                   {formatDateTime(rec.sentAt)}
                                 </span>
                               )}
@@ -478,7 +465,7 @@ export function MessageScheduler({
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-[#71717A]">
+                      <p className="text-xs text-muted">
                         No recipient logs available for this message.
                       </p>
                     )}
@@ -489,6 +476,6 @@ export function MessageScheduler({
           })}
         </div>
       )}
-    </div>
+    </section>
   );
 }

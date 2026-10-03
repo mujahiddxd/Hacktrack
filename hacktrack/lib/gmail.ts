@@ -15,7 +15,9 @@ const SCOPES = [
   "https://www.googleapis.com/auth/userinfo.email",
 ];
 
-export function getGoogleAuthUrl(returnTo: string = "/settings"): string {
+export const SIGN_IN_SCOPES = ["openid", "email", "profile"];
+
+export function getGoogleAuthUrl(state: string): string {
   if (!process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID.trim() === "") {
     throw new Error(
       "GOOGLE_CLIENT_ID is not configured in hacktrack/.env. Add your Google OAuth credentials or use 'Connect Demo Account' to test immediately."
@@ -27,11 +29,52 @@ export function getGoogleAuthUrl(returnTo: string = "/settings"): string {
     access_type: "offline",
     prompt: "consent",
     scope: SCOPES,
-    state: returnTo,
+    state,
   });
 }
 
-export async function exchangeCodeForTokens(code: string) {
+export function getGoogleSignInUrl(state: string): string {
+  const client = getOAuth2Client();
+  return client.generateAuthUrl({
+    scope: SIGN_IN_SCOPES,
+    state,
+    prompt: "select_account",
+  });
+}
+
+export interface GoogleProfile {
+  googleId: string;
+  email: string;
+  emailVerified: boolean;
+  name: string | null;
+  image: string | null;
+}
+
+/** Exchanges a sign-in code for the Google profile. Tokens are discarded; only identity is kept. */
+export async function getGoogleProfileFromCode(code: string): Promise<GoogleProfile> {
+  const client = getOAuth2Client();
+  const { tokens } = await client.getToken(code);
+  if (!tokens.id_token) {
+    throw new Error("Google did not return an ID token.");
+  }
+  const ticket = await client.verifyIdToken({
+    idToken: tokens.id_token,
+    audience: process.env.GOOGLE_CLIENT_ID,
+  });
+  const payload = ticket.getPayload();
+  if (!payload?.sub || !payload.email) {
+    throw new Error("Google account has no email address.");
+  }
+  return {
+    googleId: payload.sub,
+    email: payload.email.toLowerCase(),
+    emailVerified: payload.email_verified === true,
+    name: payload.name ?? null,
+    image: payload.picture ?? null,
+  };
+}
+
+export async function exchangeCodeForTokens(userId: string, code: string) {
   const client = getOAuth2Client();
   const { tokens } = await client.getToken(code);
   client.setCredentials(tokens);
@@ -43,7 +86,7 @@ export async function exchangeCodeForTokens(code: string) {
 
   if (!tokens.refresh_token) {
     const existing = await prisma.googleAuthToken.findUnique({
-      where: { id: "primary" },
+      where: { userId },
     });
     if (existing?.refreshToken) {
       tokens.refresh_token = existing.refreshToken;
@@ -51,9 +94,9 @@ export async function exchangeCodeForTokens(code: string) {
   }
 
   const savedToken = await prisma.googleAuthToken.upsert({
-    where: { id: "primary" },
+    where: { userId },
     create: {
-      id: "primary",
+      userId,
       email: email,
       accessToken: tokens.access_token || "",
       refreshToken: tokens.refresh_token || "",
@@ -74,11 +117,11 @@ export async function exchangeCodeForTokens(code: string) {
   return savedToken;
 }
 
-export async function connectDemoAccount(email = "organizer.hacktrack@gmail.com") {
+export async function connectDemoAccount(userId: string, email = "organizer.hacktrack@gmail.com") {
   return prisma.googleAuthToken.upsert({
-    where: { id: "primary" },
+    where: { userId },
     create: {
-      id: "primary",
+      userId,
       email: email,
       accessToken: "demo_access_token_" + Date.now(),
       refreshToken: "demo_refresh_token_" + Date.now(),
@@ -97,13 +140,37 @@ export async function connectDemoAccount(email = "organizer.hacktrack@gmail.com"
   });
 }
 
-export async function getConnectedGmailAccount() {
-  // Check if SMTP App Password is configured in .env
+function getSmtpConfig() {
   const smtpPass = process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
   const smtpUser = process.env.SMTP_USER || process.env.SMTP_EMAIL || "mujahidchoudhry37@gmail.com";
-  if (smtpPass && smtpPass.trim() !== "") {
+  if (!smtpPass || smtpPass.trim() === "") return null;
+  return { user: smtpUser, pass: smtpPass.replace(/\s+/g, "").trim() };
+}
+
+/**
+ * Delivery priority for a user: their own linked Gmail (OAuth) -> the shared SMTP
+ * mailbox from .env -> their demo simulator token.
+ */
+export async function getConnectedGmailAccount(userId: string) {
+  const token = await prisma.googleAuthToken.findUnique({
+    where: { userId },
+  });
+  const isDemo = !!token?.refreshToken.startsWith("demo_");
+
+  if (token?.refreshToken && !isDemo) {
     return {
-      email: smtpUser,
+      email: token.email,
+      connected: true,
+      isDemo: false,
+      isSmtp: false,
+      updatedAt: token.updatedAt,
+    };
+  }
+
+  const smtp = getSmtpConfig();
+  if (smtp) {
+    return {
+      email: smtp.user,
       connected: true,
       isDemo: false,
       isSmtp: true,
@@ -111,28 +178,25 @@ export async function getConnectedGmailAccount() {
     };
   }
 
-  const token = await prisma.googleAuthToken.findUnique({
-    where: { id: "primary" },
-  });
   if (!token || !token.refreshToken) return null;
   return {
     email: token.email,
     connected: true,
-    isDemo: token.refreshToken.startsWith("demo_"),
+    isDemo: true,
     isSmtp: false,
     updatedAt: token.updatedAt,
   };
 }
 
-export async function disconnectGmailAccount() {
+export async function disconnectGmailAccount(userId: string) {
   return prisma.googleAuthToken.deleteMany({
-    where: { id: "primary" },
+    where: { userId },
   });
 }
 
-export async function getAuthenticatedGmailClient() {
+export async function getAuthenticatedGmailClient(userId: string) {
   const token = await prisma.googleAuthToken.findUnique({
-    where: { id: "primary" },
+    where: { userId },
   });
   if (!token || !token.refreshToken) {
     throw new Error("Gmail is not connected. Please connect Google OAuth first.");
@@ -149,7 +213,7 @@ export async function getAuthenticatedGmailClient() {
 
   client.on("tokens", async (refreshedTokens) => {
     await prisma.googleAuthToken.update({
-      where: { id: "primary" },
+      where: { userId },
       data: {
         accessToken: refreshedTokens.access_token || token.accessToken,
         ...(refreshedTokens.refresh_token
@@ -166,32 +230,72 @@ export async function getAuthenticatedGmailClient() {
 }
 
 export async function sendEmail({
+  userId,
   to,
   subject,
   body,
 }: {
+  /** Owner of the message; their linked Gmail is used when available. */
+  userId: string | null;
   to: string;
   subject: string;
   body: string;
 }) {
-  // 1. First priority: Direct Gmail SMTP if App Password is provided in .env
-  const smtpPass = process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
-  const smtpUser = process.env.SMTP_USER || process.env.SMTP_EMAIL || "mujahidchoudhry37@gmail.com";
+  const token = userId
+    ? await prisma.googleAuthToken.findUnique({ where: { userId } })
+    : null;
+  const hasRealToken =
+    !!token?.refreshToken &&
+    !token.refreshToken.startsWith("demo_") &&
+    !!process.env.GOOGLE_CLIENT_SECRET;
 
-  if (smtpPass && smtpPass.trim() !== "") {
-    const cleanPass = smtpPass.replace(/\s+/g, "").trim();
+  // 1. First priority: the user's own Gmail account linked via OAuth
+  if (hasRealToken) {
+    const gmail = await getAuthenticatedGmailClient(userId!);
+
+    const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString("base64")}?=`;
+    const messageParts = [
+      `To: ${to}`,
+      `Subject: ${utf8Subject}`,
+      "MIME-Version: 1.0",
+      "Content-Type: text/plain; charset=utf-8",
+      "Content-Transfer-Encoding: 7bit",
+      "",
+      body,
+    ];
+    const message = messageParts.join("\r\n");
+
+    const encodedMessage = Buffer.from(message)
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+
+    const response = await gmail.users.messages.send({
+      userId: "me",
+      requestBody: {
+        raw: encodedMessage,
+      },
+    });
+
+    return { ...response.data, isRealDelivery: true };
+  }
+
+  // 2. Second priority: shared Gmail SMTP if an App Password is provided in .env
+  const smtp = getSmtpConfig();
+  if (smtp) {
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || "smtp.gmail.com",
       port: Number(process.env.SMTP_PORT || 465),
       secure: Number(process.env.SMTP_PORT || 465) === 465,
       auth: {
-        user: smtpUser,
-        pass: cleanPass,
+        user: smtp.user,
+        pass: smtp.pass,
       },
     });
 
     const info = await transporter.sendMail({
-      from: `"HackTrack" <${smtpUser}>`,
+      from: `"HackTrack" <${smtp.user}>`,
       to,
       subject,
       text: body,
@@ -200,67 +304,31 @@ export async function sendEmail({
     console.log(`\n======================================================`);
     console.log(`[DISPATCHED VIA REAL GMAIL SMTP]`);
     console.log(`  To: ${to}`);
-    console.log(`  From: ${smtpUser}`);
+    console.log(`  From: ${smtp.user}`);
     console.log(`  Message ID: ${info.messageId}`);
     console.log(`======================================================\n`);
 
     return { id: info.messageId, threadId: info.messageId, isRealDelivery: true };
   }
 
-  // 2. Second priority: OAuth Token via Google Cloud API
-  const token = await prisma.googleAuthToken.findUnique({
-    where: { id: "primary" },
-  });
   if (!token || !token.refreshToken) {
     throw new Error(
-      "No live email delivery configured. To receive real emails in your inbox, either provide a Google App Password (SMTP_PASS in .env) or authorize Google OAuth in Google Cloud Console."
+      "No live email delivery configured. Connect your Gmail account in Settings, or provide a Google App Password (SMTP_PASS in .env)."
     );
   }
 
-  // Demo Simulator Mode
-  if (token.refreshToken.startsWith("demo_") || !process.env.GOOGLE_CLIENT_SECRET) {
-    console.log(`\n======================================================`);
-    console.log(`[DISPATCHED VIA GMAIL SIMULATOR (No real email sent)]`);
-    console.log(`  To: ${to}`);
-    console.log(`  From: ${token.email}`);
-    console.log(`  Subject: ${subject}`);
-    console.log(`  Body: ${body.slice(0, 100)}...`);
-    console.log(`======================================================\n`);
-    await new Promise((resolve) => setTimeout(resolve, 350));
-    return {
-      id: "demo_msg_" + Date.now(),
-      threadId: "demo_th_" + Date.now(),
-      isDemo: true,
-    };
-  }
-
-  // Production Gmail API dispatch
-  const gmail = await getAuthenticatedGmailClient();
-
-  const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString("base64")}?=`;
-  const messageParts = [
-    `To: ${to}`,
-    `Subject: ${utf8Subject}`,
-    "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=utf-8",
-    "Content-Transfer-Encoding: 7bit",
-    "",
-    body,
-  ];
-  const message = messageParts.join("\r\n");
-
-  const encodedMessage = Buffer.from(message)
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-
-  const response = await gmail.users.messages.send({
-    userId: "me",
-    requestBody: {
-      raw: encodedMessage,
-    },
-  });
-
-  return { ...response.data, isRealDelivery: true };
+  // 3. Demo Simulator Mode
+  console.log(`\n======================================================`);
+  console.log(`[DISPATCHED VIA GMAIL SIMULATOR (No real email sent)]`);
+  console.log(`  To: ${to}`);
+  console.log(`  From: ${token.email}`);
+  console.log(`  Subject: ${subject}`);
+  console.log(`  Body: ${body.slice(0, 100)}...`);
+  console.log(`======================================================\n`);
+  await new Promise((resolve) => setTimeout(resolve, 350));
+  return {
+    id: "demo_msg_" + Date.now(),
+    threadId: "demo_th_" + Date.now(),
+    isDemo: true,
+  };
 }

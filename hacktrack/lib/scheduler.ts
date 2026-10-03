@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/gmail";
+import { recordActivity } from "@/lib/activity";
 
 export async function processDueScheduledMessages() {
   const now = new Date();
@@ -85,20 +86,28 @@ export async function processDueScheduledMessages() {
 
         // Send email via Gmail API
         await sendEmail({
+          userId: message.hackathon?.userId ?? null,
           to: recipient.participant.email,
           subject: personalizedSubject,
           body: personalizedBody,
         });
 
         // Update recipient record
+        const deliveredAt = new Date();
         await prisma.messageRecipient.update({
           where: { id: recipient.id },
           data: {
             status: "SENT",
-            sentAt: new Date(),
+            sentAt: deliveredAt,
             errorMessage: null,
           },
         });
+        // Confirmed delivery counts toward the streak (keyed by recipient, so a retry can't double-count)
+        if (message.hackathon?.userId) {
+          await recordActivity([
+            { userId: message.hackathon.userId, kind: "EMAIL_DELIVERED", refId: recipient.id, occurredAt: deliveredAt },
+          ]);
+        }
 
         messageSentCount++;
         totalSent++;

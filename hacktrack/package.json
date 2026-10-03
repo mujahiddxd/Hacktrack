@@ -12,7 +12,10 @@
     "seed": "tsx prisma/seed.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "db:push": "prisma db push"
+    "db:push": "prisma db push",
+    "db:backfill-owner": "tsx scripts/backfill-owner.ts",
+    "db:backfill-activity": "tsx scripts/backfill-activity.ts",
+    "test:streaks": "tsx --test lib/streaks/core.test.ts lib/streaks/sources.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
