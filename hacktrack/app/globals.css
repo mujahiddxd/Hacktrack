@@ -393,6 +393,67 @@ body {
   100% { opacity: 0; transform: translateX(100%); }
 }
 
+/* ── Home: "Your setup" circuit (components/home/SetupCard.tsx) ──
+   Same model as the walkthrough: inline animations with absolute delays, base styles are the finished
+   state, keyframes animate FROM the start state. data-play holds everything until the card is seen. */
+.ht-sc[data-play="paused"] * {
+  animation-play-state: paused !important;
+}
+.ht-sc svg * {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+/* Pulses and travelling markers end hidden, so with animations off they never show */
+.ht-sc .sc-hidden { opacity: 0; }
+
+@keyframes sc-line { from { transform: scaleX(0); } }
+@keyframes sc-node-in { from { opacity: 0; transform: translateY(5px); } }
+@keyframes sc-show { from { opacity: 0; } }
+@keyframes sc-seg { from { transform: scaleX(0); } }
+@keyframes sc-ready { from { opacity: 0; transform: translateY(4px); } }
+@keyframes sc-press {
+  0%, 100% { transform: translate(0, 0); }
+  45% { transform: translate(3px, 3px); }
+}
+@keyframes sc-ring {
+  0% { opacity: 0; transform: scale(1); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.2); }
+}
+@keyframes sc-badge {
+  0% { opacity: 0; transform: scale(0.5); }
+  70% { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes sc-check { from { stroke-dashoffset: 12; } }
+@keyframes sc-pulse {
+  0% { opacity: 0; transform: translateY(0); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-30px); }
+}
+@keyframes sc-count {
+  0%, 100% { transform: scale(1); }
+  45% { transform: scale(1.12); }
+}
+/* Final pulse runs the full connector (node 1 centre to node 4 centre = 204 units) */
+@keyframes sc-travel {
+  0% { opacity: 0; transform: translateX(0); }
+  15%, 85% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(204px); }
+}
+/* Per-icon completion moves */
+@keyframes sc-unfold { from { transform: scaleX(0); } }
+@keyframes sc-align { from { opacity: 0.5; transform: translate(5px, -3px); } }
+@keyframes sc-plug { from { transform: translateX(-5px); } }
+@keyframes sc-hand { from { transform: rotate(-90deg); } }
+
+/* Reduced motion: static, correct states only — no entrance, pulses, travel or unfolding */
+@media (prefers-reduced-motion: reduce) {
+  .ht-sc * {
+    animation: none !important;
+  }
+}
+
 /* The Home walkthrough deliberately plays even with reduced motion (product decision); only the hero entrance is skipped */
 @media (prefers-reduced-motion: reduce) {
   .ht-rise {

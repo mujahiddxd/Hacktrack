@@ -5,8 +5,6 @@ import {
   ArrowRight,
   CalendarCheck,
   CalendarX2,
-  CheckCircle2,
-  Circle,
   ClipboardPaste,
   History,
   Lock,
@@ -22,6 +20,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { PageShell } from "@/components/ui/page-header";
 import { HowItWorksMotion } from "@/components/home/HowItWorksMotion";
 import { StreakDeck } from "@/components/streaks/StreakDeck";
+import { SetupCard, type SetupStep } from "@/components/home/SetupCard";
 
 export const dynamic = "force-dynamic";
 
@@ -76,8 +75,9 @@ export default async function HomePage() {
   const emailReady = !!gmail?.connected && !gmail.isDemo;
   const messagesTotal = metrics.scheduledMessagesCount + metrics.sentMessagesCount;
 
-  const setup = [
+  const setup: SetupStep[] = [
     {
+      id: "hackathon",
       done: metrics.totalHackathons > 0,
       title: "Add your first hackathon",
       detail:
@@ -87,6 +87,7 @@ export default async function HomePage() {
       href: metrics.totalHackathons > 0 ? "/hackathons" : "/hackathons/new",
     },
     {
+      id: "participants",
       done: metrics.totalParticipants > 0,
       title: "Add participants",
       detail:
@@ -96,12 +97,14 @@ export default async function HomePage() {
       href: "/hackathons",
     },
     {
+      id: "gmail",
       done: emailReady,
       title: "Connect Gmail",
       detail: emailReady ? `Sending as ${gmail?.email}` : "Needed so scheduled emails can be sent for you",
       href: "/settings",
     },
     {
+      id: "email",
       done: messagesTotal > 0,
       title: "Schedule your first email",
       detail:
@@ -111,7 +114,6 @@ export default async function HomePage() {
       href: "/hackathons",
     },
   ];
-  const doneCount = setup.filter((s) => s.done).length;
 
   return (
     <PageShell className="space-y-14 sm:space-y-20">
@@ -151,60 +153,7 @@ export default async function HomePage() {
           </div>
         </div>
 
-        <aside style={delay(0.3)} className="ht-rise brutal-card min-w-0 rounded-2xl p-5 sm:p-6">
-          <div className="flex items-center justify-between gap-3 border-b-2 border-ink pb-4">
-            <div>
-              <p className="font-mono text-xs font-bold uppercase tracking-wider text-muted">Your setup</p>
-              <h2 className="text-xl font-black tracking-tight">
-                {doneCount === setup.length ? "All set 🎉" : "Get going in 4 steps"}
-              </h2>
-            </div>
-            <span className="rounded-md border-2 border-ink bg-[#FFEB3B] text-on-accent px-2 py-1 font-mono text-sm font-black tabular-nums shadow-brutal-sm">
-              {doneCount}/{setup.length}
-            </span>
-          </div>
-
-          <div
-            className="mt-4 flex h-2.5 gap-1"
-            role="progressbar"
-            aria-label="Setup progress"
-            aria-valuemin={0}
-            aria-valuemax={setup.length}
-            aria-valuenow={doneCount}
-          >
-            {/* Fills left to right by count, whichever steps are done */}
-            {setup.map((s, i) => (
-              <span
-                key={s.title}
-                className={`flex-1 rounded-full border-2 border-ink ${i < doneCount ? "bg-[#00E676] text-on-accent" : "bg-surface"}`}
-              />
-            ))}
-          </div>
-
-          <ul className="mt-4 space-y-2">
-            {setup.map((s) => (
-              <li key={s.title}>
-                <Link
-                  href={s.href}
-                  className="group flex items-start gap-3 rounded-lg border-2 border-transparent p-2.5 transition-colors hover:border-ink hover:bg-canvas"
-                >
-                  {s.done ? (
-                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#00C853]" aria-label="Done" />
-                  ) : (
-                    <Circle className="mt-0.5 h-5 w-5 shrink-0 text-faint" aria-label="To do" />
-                  )}
-                  <span className="min-w-0 flex-1">
-                    <span className={`block text-sm font-black ${s.done ? "text-muted line-through decoration-2" : ""}`}>
-                      {s.title}
-                    </span>
-                    <span className="block truncate text-xs font-medium text-muted">{s.detail}</span>
-                  </span>
-                  <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-faint transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </aside>
+        <SetupCard steps={setup} userId={user.id} style={delay(0.3)} />
       </section>
 
       {/* ── How it works (motion) ── */}

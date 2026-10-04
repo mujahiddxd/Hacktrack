@@ -89,21 +89,22 @@ function subscribeVisibility(cb: () => void) {
 const getTabHidden = () => document.hidden;
 
 export function HowItWorksMotion() {
-  const rootRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const [runKey, setRunKey] = useState(0);
   const [phase, setPhase] = useState<"idle" | "playing" | "done">("idle");
   const [inView, setInView] = useState(false);
   const splashActive = useSyncExternalStore(subscribeSplash, isSplashActive, () => false);
   const tabHidden = useSyncExternalStore(subscribeVisibility, getTabHidden, () => false);
 
-  // Start once a meaningful part of the section is visible; pause whenever it leaves view entirely
+  // Start only once the cards themselves are mostly on screen (so it waits for a scroll when just the heading peeks in
+  // below the hero on load); pause whenever they leave view entirely
   useEffect(() => {
-    const el = rootRef.current;
+    const el = stageRef.current;
     if (!el) return;
     const io = new IntersectionObserver(
       ([entry]) => {
         const meaningful =
-          entry.intersectionRatio >= 0.35 || entry.intersectionRect.height >= window.innerHeight * 0.45;
+          entry.intersectionRatio >= 0.6 || entry.intersectionRect.height >= window.innerHeight * 0.5;
         if (meaningful) {
           setInView(true);
           setPhase((p) => (p === "idle" ? "playing" : p));
@@ -111,7 +112,7 @@ export function HowItWorksMotion() {
           setInView(false);
         }
       },
-      { threshold: [0, 0.1, 0.2, 0.35, 0.5, 0.75, 1] }
+      { threshold: [0, 0.1, 0.25, 0.4, 0.6, 0.8, 1] }
     );
     io.observe(el);
     return () => io.disconnect();
@@ -127,7 +128,7 @@ export function HowItWorksMotion() {
   }
 
   return (
-    <div ref={rootRef}>
+    <div>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div className="max-w-2xl">
           <p className="font-mono text-xs font-bold uppercase tracking-wider text-muted">How HackTrack works</p>
@@ -149,67 +150,70 @@ export function HowItWorksMotion() {
         </button>
       </div>
 
-      <div
-        key={runKey}
-        className="ht-wt"
-        data-play={running ? "running" : "paused"}
-        onAnimationEnd={(e) => {
-          if ((e.target as Element).hasAttribute("data-wt-final")) setPhase("done");
-        }}
-      >
-        {/* Desktop rail: numbered nodes, connector line, travelling blue indicator */}
-        <div aria-hidden="true" className="mb-5 hidden grid-cols-4 gap-5 lg:grid">
-          {STEPS.map((s, i) => (
-            <div key={s.title} className="relative flex justify-center">
-              {i < STEPS.length - 1 && (
-                <span className="absolute left-1/2 top-1/2 h-[3px] w-[calc(100%+1.25rem)] -translate-y-1/2 bg-ink">
-                  <span className="absolute inset-0" style={{ opacity: 0, ...anim(["wt-travel", T.travel, T.end[i], "both", easeInOut]) }}>
-                    <span className="absolute left-0 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ink bg-[#2196F3] text-on-accent" />
-                  </span>
-                </span>
-              )}
-              <StepNode index={i} />
-            </div>
-          ))}
-        </div>
-
-        <ol className="grid gap-5 lg:grid-cols-4">
-          {STEPS.map(({ title, text, icon: Icon, Art }, i) => (
-            <li key={title} className="relative grid grid-cols-[2.5rem_1fr] gap-3 lg:block">
-              {/* Mobile rail: node beside each card, vertical connector down to the next one */}
-              <div aria-hidden="true" className="relative flex justify-center pt-4 lg:hidden">
+      {/* Observed for start/pause: the cards themselves, not the heading above them */}
+      <div ref={stageRef}>
+        <div
+          key={runKey}
+          className="ht-wt"
+          data-play={running ? "running" : "paused"}
+          onAnimationEnd={(e) => {
+            if ((e.target as Element).hasAttribute("data-wt-final")) setPhase("done");
+          }}
+        >
+          {/* Desktop rail: numbered nodes, connector line, travelling blue indicator */}
+          <div aria-hidden="true" className="mb-5 hidden grid-cols-4 gap-5 lg:grid">
+            {STEPS.map((s, i) => (
+              <div key={s.title} className="relative flex justify-center">
                 {i < STEPS.length - 1 && (
-                  <span className="absolute left-1/2 top-4 h-[calc(100%+1.25rem)] w-[3px] -translate-x-1/2 bg-ink" />
+                  <span className="absolute left-1/2 top-1/2 h-[3px] w-[calc(100%+1.25rem)] -translate-y-1/2 bg-ink">
+                    <span className="absolute inset-0" style={{ opacity: 0, ...anim(["wt-travel", T.travel, T.end[i], "both", easeInOut]) }}>
+                      <span className="absolute left-0 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ink bg-[#2196F3] text-on-accent" />
+                    </span>
+                  </span>
                 )}
                 <StepNode index={i} />
               </div>
-
-              <div className="wt-card relative flex h-full flex-col rounded-xl border-3 border-ink bg-surface shadow-brutal">
-                {/* Active-step outline (blue while this step plays) */}
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute -inset-[7px] rounded-[18px] border-3 border-[#2196F3]"
-                  style={{ opacity: 0, ...activeWindow(i) }}
-                />
-                <div
-                  aria-hidden="true"
-                  className="flex h-44 items-center justify-center overflow-hidden rounded-t-[9px] border-b-2 border-ink bg-canvas px-4"
-                >
-                  <Art />
+            ))}
+          </div>
+  
+          <ol className="grid gap-5 lg:grid-cols-4">
+            {STEPS.map(({ title, text, icon: Icon, Art }, i) => (
+              <li key={title} className="relative grid grid-cols-[2.5rem_1fr] gap-3 lg:block">
+                {/* Mobile rail: node beside each card, vertical connector down to the next one */}
+                <div aria-hidden="true" className="relative flex justify-center pt-4 lg:hidden">
+                  {i < STEPS.length - 1 && (
+                    <span className="absolute left-1/2 top-4 h-[calc(100%+1.25rem)] w-[3px] -translate-x-1/2 bg-ink" />
+                  )}
+                  <StepNode index={i} />
                 </div>
-                <div className="flex-1 p-4 sm:p-5">
-                  <div className="flex items-center gap-2.5">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2 border-ink bg-surface">
-                      <Icon className="h-4 w-4" aria-hidden="true" />
-                    </span>
-                    <h3 className="font-black leading-tight">{title}</h3>
+  
+                <div className="wt-card relative flex h-full flex-col rounded-xl border-3 border-ink bg-surface shadow-brutal">
+                  {/* Active-step outline (blue while this step plays) */}
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -inset-[7px] rounded-[18px] border-3 border-[#2196F3]"
+                    style={{ opacity: 0, ...activeWindow(i) }}
+                  />
+                  <div
+                    aria-hidden="true"
+                    className="flex h-44 items-center justify-center overflow-hidden rounded-t-[9px] border-b-2 border-ink bg-canvas px-4"
+                  >
+                    <Art />
                   </div>
-                  <p className="mt-2 text-sm font-medium leading-relaxed text-body">{text}</p>
+                  <div className="flex-1 p-4 sm:p-5">
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2 border-ink bg-surface">
+                        <Icon className="h-4 w-4" aria-hidden="true" />
+                      </span>
+                      <h3 className="font-black leading-tight">{title}</h3>
+                    </div>
+                    <p className="mt-2 text-sm font-medium leading-relaxed text-body">{text}</p>
+                  </div>
                 </div>
-              </div>
-            </li>
-          ))}
-        </ol>
+              </li>
+            ))}
+          </ol>
+        </div>
       </div>
     </div>
   );
