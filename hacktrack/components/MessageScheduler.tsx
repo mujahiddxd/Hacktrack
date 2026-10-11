@@ -51,11 +51,12 @@ export function MessageScheduler({
   // Form states
   const [recipientMode, setRecipientMode] = useState<"all" | "selected">("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [defaultDate, setDefaultDate] = useState("");
 
-  // Default date: 1 hour in the future formatted for datetime-local
-  const defaultDate = new Date(Date.now() + 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 16);
+  function openScheduleForm() {
+    setDefaultDate(new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16));
+    setIsScheduling(true);
+  }
 
   async function handleSchedule(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -150,7 +151,7 @@ export function MessageScheduler({
               <RefreshCw className={`h-3.5 w-3.5 ${isDispatching ? "animate-spin" : ""}`} />
               Check due
             </Button>
-            <Button variant={isScheduling ? "outline" : "primary"} size="sm" onClick={() => setIsScheduling(!isScheduling)}>
+            <Button variant={isScheduling ? "outline" : "primary"} size="sm" onClick={() => isScheduling ? setIsScheduling(false) : openScheduleForm()}>
               <Calendar className="h-4 w-4" />
               {isScheduling ? "Close form" : "Schedule message"}
             </Button>
@@ -309,7 +310,7 @@ export function MessageScheduler({
           <Button
             variant="primary"
             size="sm"
-            onClick={() => setIsScheduling(true)}
+            onClick={openScheduleForm}
             className="gap-1"
           >
             <Send className="w-4 h-4" />

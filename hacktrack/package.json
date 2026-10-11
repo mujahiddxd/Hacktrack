@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint actions app components lib prisma scripts types proxy.ts eslint.config.mjs next.config.ts",
     "postinstall": "prisma generate",
     "worker": "tsx scripts/worker.ts",
     "seed": "tsx prisma/seed.ts",

@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hacktrack
+    env:
+      DATABASE_URL: mysql://user:password@127.0.0.1:3306/hacktrack_ci
+      JWT_SECRET: ci-only-secret-not-used-for-real-sessions
+      CRON_SECRET: ci-only-secret
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: hacktrack/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test:streaks
+      - run: npm run build

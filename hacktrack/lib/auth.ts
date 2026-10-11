@@ -3,9 +3,11 @@ import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
-const SECRET_KEY = new TextEncoder().encode(
-  process.env.JWT_SECRET || "hacktrack-neubrutalism-super-secure-key-2026"
-);
+const sessionSecret = process.env.JWT_SECRET;
+if (!sessionSecret) {
+  throw new Error("JWT_SECRET must be configured.");
+}
+const SECRET_KEY = new TextEncoder().encode(sessionSecret);
 
 const SESSION_COOKIE_NAME = "hacktrack_session";
 

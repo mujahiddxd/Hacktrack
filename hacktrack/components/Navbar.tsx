@@ -32,12 +32,6 @@ export function Navbar({ userEmail, userName }: { userEmail?: string; userName?:
   const accountRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close menus on route change
-  useEffect(() => {
-    setAccountDropdownOpen(false);
-    setMobileMenuOpen(false);
-  }, [pathname]);
-
   // Click outside and Escape key to close dropdowns
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -86,7 +80,10 @@ export function Navbar({ userEmail, userName }: { userEmail?: string; userName?:
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Left: Logo + Desktop Navigation */}
         <div className="flex items-center gap-6 lg:gap-10">
-          <Link href="/home" className="flex items-center gap-2.5 group">
+          <Link href="/home" onClick={() => {
+            setAccountDropdownOpen(false);
+            setMobileMenuOpen(false);
+          }} className="flex items-center gap-2.5 group">
             <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[#FFEB3B] text-on-accent border-2 sm:border-3 border-ink shadow-brutal-sm flex items-center justify-center font-black text-base sm:text-lg group-hover:-translate-y-0.5 transition-transform">
               HT
             </div>
@@ -106,6 +103,7 @@ export function Navbar({ userEmail, userName }: { userEmail?: string; userName?:
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={() => setAccountDropdownOpen(false)}
                   className={`relative text-sm font-bold transition-colors pb-1.5 ${
                     isActive
                       ? "text-ink after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-1 after:bg-[#FFEB3B] after:border-b-2 after:border-ink"
@@ -124,6 +122,7 @@ export function Navbar({ userEmail, userName }: { userEmail?: string; userName?:
           <ThemeToggle />
           <Link
             href="/hackathons/new"
+            onClick={() => setAccountDropdownOpen(false)}
             className={buttonVariants({ className: "border-2 shadow-brutal-sm font-black" })}
           >
             <Plus className="h-4 w-4" />
@@ -169,6 +168,7 @@ export function Navbar({ userEmail, userName }: { userEmail?: string; userName?:
 
                 <Link
                   href="/account"
+                  onClick={() => setAccountDropdownOpen(false)}
                   className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-ink hover:bg-quiet rounded-lg transition-colors"
                 >
                   <User className="w-4 h-4" />

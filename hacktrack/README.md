@@ -1,124 +1,125 @@
-# ⚡ HackTrack — Neubrutalist Hackathon Command Center & Automated Broadcast Engine
+# HackTrack
 
-> A high-velocity hackathon administration hub and automated participant email broadcast platform built with Next.js 16, Prisma ORM, SQLite, and an independent background scheduling daemon.
+HackTrack is an open-source hackathon command center for organizers who need one place to manage events, participants, history, and scheduled email broadcasts.
 
----
+It combines a fast Next.js dashboard with a Prisma-backed database and an independent worker for reliable, personalized participant communication.
 
-## 🌟 Overview
+![HackTrack's four-step workflow](https://raw.githubusercontent.com/mujahiddxd/Hacktrack/main/hacktrack/image%20copy%205.png)
 
-**HackTrack** is designed for hackathon organizers and university tech communities who require precision management over multi-stage hackathons, participant rosters, and scheduled communication broadcasts.
+## Features
 
-Built with a bold **Neubrutalist** aesthetic—featuring high-contrast color palettes, hard geometric drop shadows, thick black borders, and functional monospace typography—HackTrack delivers both raw visual impact and enterprise-grade reliability.
+- Dashboard KPIs and upcoming hackathon views
+- Hackathon creation, editing, participant management, and lifecycle states
+- Searchable history and audit-friendly soft deletion
+- Scheduled, personalized email broadcasts with `{name}` and `{hackathonName}` tokens
+- Isolated recipient delivery so participant addresses are not exposed to one another
+- Background worker with atomic message claiming and per-recipient failure handling
+- JWT authentication, protected routes, password hashing, and a protected cron endpoint
+- Neubrutalist interface built with Tailwind CSS and Lucide icons
 
----
+## Tech stack
 
-## 🚀 Key Features
+- Next.js 16 with the App Router and TypeScript
+- React 19
+- Prisma ORM 6
+- MySQL-compatible database configured through `DATABASE_URL`
+- Google Gmail API / Nodemailer for email delivery
+- Tailwind CSS 4
 
-### 1. 🎛️ Administrator Command Center
-* **Real-time KPI Tracking**: Live metrics for total hackathons added, upcoming events, registered developers, and broadcast dispatches.
-* **Month-Grouped Upcoming Grids**: Hackathons taking place in the future are dynamically clustered into responsive 3-column month grids based on their actual event dates.
-* **Chronological Activity Log**: High-density timeline tracking when hackathons were entered into the system.
+## Prerequisites
 
-### 2. 📜 Complete History & Audit Log (`/history`)
-* **Instant Search & Filter**: Real-time client-side search across hackathon names, descriptions, and locations.
-* **Multi-Dimensional Filters**: Filter by creation month (`All Time`, `October 2026`, etc.) and status (`Active`, `Upcoming`, `Completed`, `Flagged`, `Removed`).
-* **Soft Deletion & State Lifecycle**: Entries can be soft-deleted (`REMOVED`), flagged (`FLAGGED`), or restored back to active state without losing historical records.
-* **Responsive Presentation**: Rich data table on desktop with quick action dropdown menus (`•••`) and card layout on mobile devices.
-* **Neubrutalist Confirmation Modals**: Esc-key and backdrop-aware accessible modal dialogs for destructive actions.
+- Node.js 20 or newer
+- npm 10 or newer
+- A MySQL-compatible database
+- Google OAuth credentials if Gmail delivery is enabled
 
-### 3. 📧 Automated Email Broadcast Engine
-* **Date & Time Scheduling**: Schedule broadcasts to go out at exact future timestamps.
-* **Recipient Isolation & Privacy**: Every participant receives their own independent email. Recipient addresses are never grouped or exposed to others.
-* **Template Token Interpolation**: Dynamic personalized tokens (e.g., `{name}` and `{hackathonName}`) are automatically replaced per recipient at dispatch time.
-* **Multi-Worker Concurrency Protection**: Atomic conditional claims (`updateMany({ status: "SCHEDULED" } -> "SENDING")`) prevent duplicate deliveries even when multiple worker processes or cron jobs execute simultaneously.
-* **Failure Fault Tolerance**: Individual recipient delivery errors are logged with error messages without failing the rest of the batch.
+## Getting started
 
-### 4. 🔄 Independent Background Worker Daemon
-* Completely decoupled Node.js process (`npm run worker`) that polls the database every 15 seconds.
-* Runs continuously in the background, unaffected by whether the administrator is logged in or if browser windows are open.
-
-### 5. 🔒 Security & Authentication
-* **10-Round Bcrypt** password hashing for administrator accounts.
-* **State-of-the-Art JWT** session tokens generated using `jose` with `HS256`, 7-day expiration, and `httpOnly` / `sameSite: lax` cookie protection.
-* **Protected Routes**: Next.js middleware guards `/dashboard`, `/hackathons`, `/history`, and `/settings`.
-* **Database-Level Integrity**: Native SQLite and Prisma `@@unique([hackathonId, email])` constraint prevents duplicate registrations.
-* **Protected Cron Endpoint**: `/api/cron/process` requires authorization via `CRON_SECRET`.
-
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|---|---|
-| **Framework** | [Next.js 16](https://nextjs.org/) (App Router + Turbopack) |
-| **Language** | [TypeScript 5](https://www.typescriptlang.org/) |
-| **Styling** | [Tailwind CSS v4](https://tailwindcss.com/) (Custom Neubrutalism Tokens) |
-| **Database** | [SQLite](https://www.sqlite.org/) via [Prisma ORM 6](https://www.prisma.io/) |
-| **Authentication** | [Jose](https://github.com/panva/jose) (JWT) + [Bcrypt.js](https://github.com/dcodeIO/bcrypt.js) |
-| **Email Dispatch** | [Google APIs](https://github.com/googleapis/google-api-nodejs-client) (OAuth 2.0 Gmail API) + Offline Simulator |
-| **Icons** | [Lucide React](https://lucide.dev/) |
-| **Notifications** | [Sonner](https://sonner.emilkowal.ski/) |
-
----
-
-## ⚡ Quickstart Guide
-
-### 1. Prerequisites
-* **Node.js** (v20.x or higher)
-* **npm** (v10.x or higher)
-
-### 2. Clone & Install
 ```bash
 git clone https://github.com/mujahiddxd/Hacktrack.git
 cd Hacktrack/hacktrack
 npm install
 ```
 
-### 3. Configure Environment Variables
-Copy the template configuration:
+Create a local environment file and edit its values:
+
 ```bash
 cp .env.example .env
 ```
-Default `.env` configuration:
-```env
-DATABASE_URL="file:./dev.db"
-JWT_SECRET="hacktrack-neubrutalism-super-secure-key-2026"
-ADMIN_EMAIL="admin@hacktrack.com"
-ADMIN_PASSWORD="adminpassword123"
-CRON_SECRET="hacktrack-cron-super-secret-2026"
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-GOOGLE_CLIENT_ID=""
-GOOGLE_CLIENT_SECRET=""
-GOOGLE_REDIRECT_URI="http://localhost:3000/api/auth/google/callback"
-```
 
-### 4. Initialize Database & Seed Sample Data
+Configure `DATABASE_URL` and generate distinct, random values for `JWT_SECRET` and `CRON_SECRET`. Set `ADMIN_PASSWORD` before running the seed script. The complete list of supported variables is documented in `.env.example`. Never use its placeholder values in a deployed environment.
+
+Initialize the database and seed local development data:
+
 ```bash
-# Push Prisma schema to SQLite
 npx prisma db push
-
-# Seed initial admin and demo hackathons
 npm run seed
 ```
 
-### 5. Launch the Platform
-In **Terminal 1** — Start the Next.js web application:
+Start the web app:
+
 ```bash
 npm run dev
 ```
-Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
-In **Terminal 2** — Start the background email worker:
+Open [http://localhost:3000](http://localhost:3000). To process scheduled broadcasts locally, run the worker in a second terminal:
+
 ```bash
 npm run worker
 ```
 
-### 6. Default Login Credentials
-* **Email:** `admin@hacktrack.com`
-* **Password:** `adminpassword123`
+The seed script creates a development administrator using `ADMIN_EMAIL` and `ADMIN_PASSWORD`. Change both values before using the application outside local development.
 
----
+## Available scripts
 
-## 📄 License
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the Next.js development server |
+| `npm run build` | Generate Prisma Client and build the app |
+| `npm run start` | Start the production server |
+| `npm run lint` | Run ESLint |
+| `npm run worker` | Run the background broadcast worker |
+| `npm run seed` | Seed a local administrator and demo data |
+| `npm run db:push` | Apply the Prisma schema to the database |
+| `npm run prisma:migrate` | Create and apply a Prisma migration |
+| `npm run test:streaks` | Run the streak-related tests |
 
-This project is licensed under the [MIT License](LICENSE).
+## Email delivery
+
+HackTrack can use Google OAuth 2.0 and the Gmail API for delivery. Create OAuth credentials in Google Cloud, set the `GOOGLE_*` variables in `.env`, and use the in-app Google connection flow. Keep client secrets and refresh tokens private, and do not commit `.env` or database files.
+
+## Project structure
+
+```text
+app/          Next.js routes, pages, and API endpoints
+actions/      Server actions
+components/   Reusable UI components
+lib/          Authentication, email, scheduling, and domain logic
+prisma/       Database schema and seed script
+scripts/      Background worker and maintenance utilities
+types/        Shared TypeScript types
+```
+
+## Contributing
+
+Contributions are welcome. See the [contributing guide](https://github.com/mujahiddxd/Hacktrack/blob/main/CONTRIBUTING.md), [Code of Conduct](https://github.com/mujahiddxd/Hacktrack/blob/main/CODE_OF_CONDUCT.md), and [security policy](https://github.com/mujahiddxd/Hacktrack/blob/main/SECURITY.md). Before opening a pull request:
+
+1. Create a focused branch from `main`.
+2. Explain the problem and the proposed change.
+3. Run `npm run lint`, `npm run build`, and relevant tests.
+4. Include screenshots or setup notes for user-facing changes.
+5. Do not include secrets, production data, `.env` files, or generated database files.
+
+Please keep pull requests small and discuss large feature changes in an issue first.
+
+## Security
+
+Do not report security vulnerabilities in public issues. Use GitHub's private security advisory workflow for this repository, or contact the maintainers privately if that workflow is unavailable.
+
+## License
+
+HackTrack is licensed under the [MIT License](https://github.com/mujahiddxd/Hacktrack/blob/main/LICENSE).
+
+## Acknowledgements
+
+Built with [Next.js](https://nextjs.org/), [Prisma](https://www.prisma.io/), [Tailwind CSS](https://tailwindcss.com/), [Lucide](https://lucide.dev/), and the [Google Gmail API](https://developers.google.com/gmail/api).

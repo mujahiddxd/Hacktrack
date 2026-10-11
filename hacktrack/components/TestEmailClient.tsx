@@ -33,6 +33,7 @@ export function TestEmailClient({ userEmail }: { userEmail: string }) {
     connected: boolean;
     email?: string;
     isDemo?: boolean;
+    isSmtp?: boolean;
     updatedAt?: Date | string;
   } | null>(null);
 
@@ -195,7 +196,7 @@ export function TestEmailClient({ userEmail }: { userEmail: string }) {
                   <Badge variant={googleStatus.isDemo ? "yellow" : "mint"}>
                     {googleStatus.isDemo
                       ? "Simulator / Demo"
-                      : (googleStatus as any)?.isSmtp
+                      : googleStatus.isSmtp
                       ? "Live Gmail SMTP"
                       : "Live Google API"}
                   </Badge>

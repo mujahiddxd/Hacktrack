@@ -52,12 +52,12 @@ export async function sendDirectTestEmailAction(to: string, subject?: string, bo
       body: body?.trim() || "Hello,\n\nThis is a live test email sent from HackTrack to confirm that email dispatch is functioning properly.\n\nBest regards,\nHackTrack Team",
     });
 
-    const isDemo = (result as any)?.isDemo === true;
-    const isRealDelivery = (result as any)?.isRealDelivery === true;
+    const isDemo = "isDemo" in result && result.isDemo === true;
+    const isRealDelivery = "isRealDelivery" in result && result.isRealDelivery === true;
 
     return {
       success: true,
-      messageId: (result as any)?.id || "sent",
+      messageId: result.id || "sent",
       timestamp: new Date().toLocaleTimeString(),
       isDemo,
       isRealDelivery,

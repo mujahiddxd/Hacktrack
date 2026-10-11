@@ -5,7 +5,10 @@ const prisma = new PrismaClient();
 
 async function main() {
   const adminEmail = process.env.ADMIN_EMAIL || "admin@hacktrack.com";
-  const adminPassword = process.env.ADMIN_PASSWORD || "adminpassword123";
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminPassword) {
+    throw new Error("ADMIN_PASSWORD must be set before running the seed script.");
+  }
 
   const passwordHash = await bcrypt.hash(adminPassword, 10);
 

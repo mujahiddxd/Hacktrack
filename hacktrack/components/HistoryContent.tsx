@@ -140,11 +140,6 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
     return found ? found.label : "All Statuses";
   }, [selectedStatus]);
 
-  // Reset pagination when any filter changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, selectedMonth, selectedStatus]);
-
   // Filtered hackathons
   const filteredHackathons = useMemo(() => {
     const today = new Date();
@@ -305,13 +300,19 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
               placeholder="Search by name, description, location..."
               className="w-full pl-10 pr-4 py-2 text-sm font-medium rounded-lg border-2 border-ink bg-canvas text-ink placeholder:text-muted focus:outline-hidden focus:ring-2 focus:ring-[#FFEB3B]"
             />
             {searchQuery && (
               <button
-                onClick={() => setSearchQuery("")}
+                onClick={() => {
+                  setSearchQuery("");
+                  setCurrentPage(1);
+                }}
                 aria-label="Clear search"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink"
               >
@@ -343,6 +344,7 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
                 <button
                   onClick={() => {
                     setSelectedMonth("all");
+                    setCurrentPage(1);
                     setMonthDropdownOpen(false);
                   }}
                   className={`w-full text-left px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${
@@ -358,6 +360,7 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
                     key={key}
                     onClick={() => {
                       setSelectedMonth(key);
+                      setCurrentPage(1);
                       setMonthDropdownOpen(false);
                     }}
                     className={`w-full text-left px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${
@@ -398,6 +401,7 @@ export default function HistoryContent({ initialHackathons }: HistoryContentProp
                     key={opt.key}
                     onClick={() => {
                       setSelectedStatus(opt.key);
+                      setCurrentPage(1);
                       setStatusDropdownOpen(false);
                     }}
                     className={`w-full text-left px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${

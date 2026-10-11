@@ -4,6 +4,8 @@ HackTrack is an open-source hackathon command center for organizers who need one
 
 It combines a fast Next.js dashboard with a Prisma-backed database and an independent worker for reliable, personalized participant communication.
 
+![HackTrack's four-step workflow](https://raw.githubusercontent.com/mujahiddxd/Hacktrack/main/hacktrack/image%20copy%205.png)
+
 ## Features
 
 - Dashboard KPIs and upcoming hackathon views
@@ -45,7 +47,7 @@ Create a local environment file and edit its values:
 cp .env.example .env
 ```
 
-At minimum, configure `DATABASE_URL` and `JWT_SECRET`. Never use the example secrets in a deployed environment. The complete list of supported variables is documented in `.env.example`.
+Configure `DATABASE_URL` and generate distinct, random values for `JWT_SECRET` and `CRON_SECRET`. Set `ADMIN_PASSWORD` before running the seed script. The complete list of supported variables is documented in `.env.example`. Never use its placeholder values in a deployed environment.
 
 Initialize the database and seed local development data:
 
@@ -100,7 +102,7 @@ types/        Shared TypeScript types
 
 ## Contributing
 
-Contributions are welcome. Before opening a pull request:
+Contributions are welcome. See the [contributing guide](https://github.com/mujahiddxd/Hacktrack/blob/main/CONTRIBUTING.md), [Code of Conduct](https://github.com/mujahiddxd/Hacktrack/blob/main/CODE_OF_CONDUCT.md), and [security policy](https://github.com/mujahiddxd/Hacktrack/blob/main/SECURITY.md). Before opening a pull request:
 
 1. Create a focused branch from `main`.
 2. Explain the problem and the proposed change.
@@ -116,9 +118,8 @@ Do not report security vulnerabilities in public issues. Use GitHub's private se
 
 ## License
 
-HackTrack is licensed under the [MIT License](LICENSE).
+HackTrack is licensed under the [MIT License](https://github.com/mujahiddxd/Hacktrack/blob/main/LICENSE).
 
 ## Acknowledgements
 
 Built with [Next.js](https://nextjs.org/), [Prisma](https://www.prisma.io/), [Tailwind CSS](https://tailwindcss.com/), [Lucide](https://lucide.dev/), and the [Google Gmail API](https://developers.google.com/gmail/api).
-
