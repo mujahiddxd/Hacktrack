@@ -116,7 +116,7 @@ Do not report security vulnerabilities in public issues. Use GitHub's private se
 
 ## License
 
-No open-source license has been added to this repository yet. Until a `LICENSE` file is committed, the project is not formally licensed for reuse. Add a license before announcing the repository as open source.
+HackTrack is licensed under the [MIT License](LICENSE).
 
 ## Acknowledgements
 
